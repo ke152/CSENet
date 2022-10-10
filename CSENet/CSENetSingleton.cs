@@ -1,6 +1,6 @@
-﻿namespace ENet;
+﻿namespace CSENet;
 
-internal class Singleton<T> where T : new()
+internal class CSENetSingleton<T> where T : new()
 {
     static T? instance;
     public static T Instance

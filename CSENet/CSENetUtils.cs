@@ -2,9 +2,9 @@
 using System.Net;
 using System.Text;
 
-namespace ENet;
+namespace CSENet;
 
-class Utils
+class CSENetUtils
 {
     private static DateTime timeStart = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
     private static DateTime timeBase = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
