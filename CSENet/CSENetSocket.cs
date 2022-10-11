@@ -1,9 +1,9 @@
 ﻿using System.Net;
 using System.Net.Sockets;
 
-namespace ENet;
+namespace CSENet;
 
-enum ENetSocketOptType
+enum CSENetSocketOptType
 {
     NonBlock = 1,
     Broadcast = 2,
@@ -16,7 +16,7 @@ enum ENetSocketOptType
     NoDelay = 9
 }
 
-enum ENetSocketWait
+enum CSENetSocketWait
 {
     None = 0,
     Send = (1 << 0),
@@ -24,56 +24,56 @@ enum ENetSocketWait
     Interrupt = (1 << 2)
 }
 
-class ENetSocket
+class CSENetSocket
 {
     public Socket socket;
     public IPEndPoint? localIP;
 
-    public ENetSocket()
+    public CSENetSocket()
     {
         socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
     }
-    private ENetSocket(Socket socket)
+    private CSENetSocket(Socket socket)
     {
         this.socket = socket;
     }
 
-    ~ENetSocket()
+    ~CSENetSocket()
     {
         socket.Close();
     }
 
-    public void SetOption(ENetSocketOptType type, int value)
+    public void SetOption(CSENetSocketOptType type, int value)
     {
         switch (type)
         {
-            case ENetSocketOptType.NonBlock:
+            case CSENetSocketOptType.NonBlock:
                 //socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveTimeout, value);
                 //socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.SendTimeout, value);
                 //socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.UnblockSource, value);
                 break;
-            case ENetSocketOptType.Broadcast:
+            case CSENetSocketOptType.Broadcast:
                 socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Broadcast, value);
                 break;
-            case ENetSocketOptType.RcvBuf:
+            case CSENetSocketOptType.RcvBuf:
                 socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveBuffer, value);
                 break;
-            case ENetSocketOptType.SendBuf:
+            case CSENetSocketOptType.SendBuf:
                 socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.SendBuffer, value);
                 break;
-            case ENetSocketOptType.ReuseAddr:
+            case CSENetSocketOptType.ReuseAddr:
                 socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, value);
                 break;
-            case ENetSocketOptType.RcvTimeout:
+            case CSENetSocketOptType.RcvTimeout:
                 socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveTimeout, value);
                 break;
-            case ENetSocketOptType.SendTimeout:
+            case CSENetSocketOptType.SendTimeout:
                 socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.SendTimeout, value);
                 break;
-            case ENetSocketOptType.Error:
+            case CSENetSocketOptType.Error:
                 socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.Error, value);
                 break;
-            case ENetSocketOptType.NoDelay:
+            case CSENetSocketOptType.NoDelay:
                 socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.NoDelay, value);
                 break;
             default:
@@ -121,9 +121,9 @@ class ENetSocket
         socket.Connect(remoteEP);
     }
 
-    public ENetSocket Accept()
+    public CSENetSocket Accept()
     {
-        return new ENetSocket(socket.Accept());
+        return new CSENetSocket(socket.Accept());
     }
 
     public bool Wait(Int32 microSecondsTimeout, SelectMode mode)
