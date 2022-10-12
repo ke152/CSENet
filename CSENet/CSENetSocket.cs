@@ -3,7 +3,7 @@ using System.Net.Sockets;
 
 namespace CSENet;
 
-enum CSENetSocketOptType
+public enum CSENetSocketOptType
 {
     NonBlock = 1,
     Broadcast = 2,
@@ -16,7 +16,7 @@ enum CSENetSocketOptType
     NoDelay = 9
 }
 
-enum CSENetSocketWait
+public enum CSENetSocketWait
 {
     None = 0,
     Send = (1 << 0),
@@ -24,7 +24,7 @@ enum CSENetSocketWait
     Interrupt = (1 << 2)
 }
 
-class CSENetSocket
+public class CSENetSocket
 {
     public Socket socket;
     public IPEndPoint? localIP;
@@ -116,9 +116,15 @@ class CSENetSocket
         return localIP;
     }
 
+    public void Connect(string ip, int port)
+    {
+        var remoteEP = new IPEndPoint(IPAddress.Parse(ip), port);
+        socket.Connect(remoteEP);
+    }
+
     public void Connect(IPEndPoint remoteEP)
     {
-        socket.Connect(remoteEP);
+        socket.Connect(remoteEP);//TODO: try-catch
     }
 
     public CSENetSocket Accept()
@@ -166,7 +172,6 @@ class CSENetSocket
             return 0;
         }
     }
-
 
 
 }
