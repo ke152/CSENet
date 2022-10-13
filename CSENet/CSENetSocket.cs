@@ -98,15 +98,6 @@ public class CSENetSocket
         localIP = ep;
     }
 
-    public void Listen(int backlog = 100)
-    {
-        //TODO: 如果backlog小于0会怎么样？
-        //TODO：如果backlog超过SocketOptionName.MaxConnections，会怎样？
-        //TODO：是否应该增加try-except模块
-        //TODO：使用Listen的无参调用，让socket自己设置。会有什么影响？
-        socket.Listen(backlog);
-    }
-
     public IPEndPoint? GetAddress()
     {
         if (localIP == null)
@@ -114,22 +105,6 @@ public class CSENetSocket
             localIP = socket.LocalEndPoint as IPEndPoint;
         }
         return localIP;
-    }
-
-    public void Connect(string ip, int port)
-    {
-        var remoteEP = new IPEndPoint(IPAddress.Parse(ip), port);
-        socket.Connect(remoteEP);
-    }
-
-    public void Connect(IPEndPoint remoteEP)
-    {
-        socket.Connect(remoteEP);//TODO: try-catch
-    }
-
-    public CSENetSocket Accept()
-    {
-        return new CSENetSocket(socket.Accept());
     }
 
     public bool Wait(Int32 microSecondsTimeout, SelectMode mode)
