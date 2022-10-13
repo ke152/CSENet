@@ -1,6 +1,4 @@
-﻿using System.Runtime.InteropServices;
-namespace CSENet;
-
+﻿namespace CSENet;
 
 enum CSENetProtoFlag
 {
@@ -14,7 +12,6 @@ enum CSENetProtoFlag
     HeaderSessionMask = (3 << 12),
     HeaderSessionShift = 12
 };
-
 
 enum CSENetProtoCmdType
 {
@@ -61,3 +58,101 @@ class ENetProtoCmdHeader
         this.reliableSeqNum = reliableSeqNum;
     }
 }
+
+class ENetProtoAck
+{
+    public uint receivedReliableSeqNum = 0;
+    public uint receivedSentTime = 0;
+};
+
+class ENetProtoConnect
+{
+    public uint outPeerID = 0;
+    public uint inSessionID = 0;
+    public uint outSessionID = 0;
+    public uint mtu = 0;
+    public uint windowSize = 0;
+    public uint channelCount = 0;
+    public uint inBandwidth = 0;
+    public uint outBandwidth = 0;
+    public uint packetThrottleInterval = 0;
+    public uint packetThrottleAcceleration = 0;
+    public uint packetThrottleDeceleration = 0;
+    public uint connectID = 0;
+    public uint data = 0;
+};
+
+class ENetProtoVerifyConnect
+{
+    public uint outPeerID = 0;
+    public uint inSessionID = 0;
+    public uint outSessionID = 0;
+    public uint mtu = 0;
+    public uint windowSize = 0;
+    public uint channelCount = 0;
+    public uint inBandwidth = 0;
+    public uint outBandwidth = 0;
+    public uint packetThrottleInterval = 0;
+    public uint packetThrottleAcceleration = 0;
+    public uint packetThrottleDeceleration = 0;
+    public uint connectID = 0;
+};
+
+class ENetProtoBandwidthLimit
+{
+    public uint inBandwidth = 0;
+    public uint outBandwidth = 0;
+};
+
+class ENetProtoThrottleConfigure
+{
+    public uint packetThrottleInterval = 0;
+    public uint packetThrottleAcceleration = 0;
+    public uint packetThrottleDeceleration = 0;
+};
+
+class ENetProtoDisconnect
+{
+    public uint data = 0;
+};
+
+class ENetProtoPing
+{
+};
+
+class ENetProtoSendReliable
+{
+    public uint dataLength = 0;
+};
+
+class ENetProtoSendUnReliable
+{
+    public uint dataLength = 0;
+    public uint unreliableSeqNum = 0;
+};
+
+class ENetProtoSendUnsequenced
+{
+    public uint unseqGroup = 0;
+    public uint dataLength = 0;
+};
+
+class ENetProtoSendFragment
+{
+    public uint startSeqNum = 0;
+    public uint dataLength = 0;
+    public uint fragmentCount = 0;
+    public uint fragmentNum = 0;
+    public uint totalLength = 0;
+    public uint fragmentOffset = 0;
+};
+
+
+
+
+
+
+
+
+
+
