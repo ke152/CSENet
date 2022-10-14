@@ -34,26 +34,26 @@ enum CSENetProtoCmdType
     Mask = 15
 };
 
-class ENetProtoHeader
+class CSENetProtoHeader
 {
     public uint peerID;
     public uint sentTime;
 };
 
-class ENetProtoCmdHeader
+class CSENetProtoCmdHeader
 {
     public int cmdFlag = 0;
     public uint channelID;
     public uint reliableSeqNum;
 
-    public ENetProtoCmdHeader()
+    public CSENetProtoCmdHeader()
     {
         this.cmdFlag = 0;
         this.channelID = 0;
         this.reliableSeqNum = 0;
     }
 
-    public ENetProtoCmdHeader(int cmdFlag, uint channelID, uint reliableSeqNum)
+    public CSENetProtoCmdHeader(int cmdFlag, uint channelID, uint reliableSeqNum)
     {
         this.cmdFlag = cmdFlag;
         this.channelID = channelID;
@@ -61,13 +61,13 @@ class ENetProtoCmdHeader
     }
 }
 
-class ENetProtoAck
+class CSENetProtoAck
 {
     public uint receivedReliableSeqNum = 0;
     public uint receivedSentTime = 0;
 };
 
-class ENetProtoConnect
+class CSENetProtoConnect
 {
     public uint outPeerID = 0;
     public uint inSessionID = 0;
@@ -84,7 +84,7 @@ class ENetProtoConnect
     public uint data = 0;
 };
 
-class ENetProtoVerifyConnect
+class CSENetProtoVerifyConnect
 {
     public uint outPeerID = 0;
     public uint inSessionID = 0;
@@ -100,46 +100,46 @@ class ENetProtoVerifyConnect
     public uint connectID = 0;
 };
 
-class ENetProtoBandwidthLimit
+class CSENetProtoBandwidthLimit
 {
     public uint inBandwidth = 0;
     public uint outBandwidth = 0;
 };
 
-class ENetProtoThrottleConfigure
+class CSENetProtoThrottleConfigure
 {
     public uint packetThrottleInterval = 0;
     public uint packetThrottleAcceleration = 0;
     public uint packetThrottleDeceleration = 0;
 };
 
-class ENetProtoDisconnect
+class CSENetProtoDisconnect
 {
     public uint data = 0;
 };
 
-class ENetProtoPing
+class CSENetProtoPing
 {
 };
 
-class ENetProtoSendReliable
+class CSENetProtoSendReliable
 {
     public uint dataLength = 0;
 };
 
-class ENetProtoSendUnReliable
+class CSENetProtoSendUnReliable
 {
     public uint dataLength = 0;
     public uint unreliableSeqNum = 0;
 };
 
-class ENetProtoSendUnsequenced
+class CSENetProtoSendUnsequenced
 {
     public uint unseqGroup = 0;
     public uint dataLength = 0;
 };
 
-class ENetProtoSendFragment
+class CSENetProtoSendFragment
 {
     public uint startSeqNum = 0;
     public uint dataLength = 0;
@@ -149,28 +149,28 @@ class ENetProtoSendFragment
     public uint fragmentOffset = 0;
 };
 
-internal class ENetProto
+internal class CSENetProto
 {
-    public ENetProtoCmdHeader header;
-    public ENetProtoAck? ack;
-    public ENetProtoConnect? connect;
-    public ENetProtoVerifyConnect? verifyConnect;
-    public ENetProtoDisconnect? disconnect;
-    public ENetProtoPing? ping;
-    public ENetProtoSendReliable? sendReliable;
-    public ENetProtoSendUnReliable? sendUnReliable;
-    public ENetProtoSendUnsequenced? sendUnseq;
-    public ENetProtoSendFragment? sendFragment;
-    public ENetProtoBandwidthLimit? bandwidthLimit;
-    public ENetProtoThrottleConfigure? throttleConfigure;
+    public CSENetProtoCmdHeader header;
+    public CSENetProtoAck? ack;
+    public CSENetProtoConnect? connect;
+    public CSENetProtoVerifyConnect? verifyConnect;
+    public CSENetProtoDisconnect? disconnect;
+    public CSENetProtoPing? ping;
+    public CSENetProtoSendReliable? sendReliable;
+    public CSENetProtoSendUnReliable? sendUnReliable;
+    public CSENetProtoSendUnsequenced? sendUnseq;
+    public CSENetProtoSendFragment? sendFragment;
+    public CSENetProtoBandwidthLimit? bandwidthLimit;
+    public CSENetProtoThrottleConfigure? throttleConfigure;
 
-    public ENetProto()
+    public CSENetProto()
     {//TODO:这个构造函数可能需要改？不需要所有的都new出来吧？
         this.header = new();
     }
 }
 
-static class ENetProtoCmdSize
+static class CSENetProtoCmdSize
 {
     public static List<uint> CmdSize = Init();
 
@@ -179,18 +179,17 @@ static class ENetProtoCmdSize
         List<uint> cmdSizeList = new List<uint>();
 
         cmdSizeList.Add(0);
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<ENetProtoAck>()));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoConnect())));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoVerifyConnect())));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoDisconnect())));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoPing())));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoSendReliable())));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoSendUnReliable())));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoSendUnsequenced())));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoSendUnsequenced())));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoBandwidthLimit())));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoThrottleConfigure())));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoSendFragment())));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoAck>()));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoConnect>()));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoVerifyConnect>()));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoDisconnect>()));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoPing>()));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoSendReliable>()));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoSendUnReliable>()));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoSendUnsequenced>()));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoBandwidthLimit>()));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoThrottleConfigure>()));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoSendFragment>()));
 
         return cmdSizeList;
     }
