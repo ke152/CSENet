@@ -1,4 +1,6 @@
-﻿namespace CSENet;
+﻿using System.Runtime.InteropServices;
+
+namespace CSENet;
 
 enum CSENetProtoFlag
 {
@@ -147,9 +149,52 @@ class ENetProtoSendFragment
     public uint fragmentOffset = 0;
 };
 
+internal class ENetProto
+{
+    public ENetProtoCmdHeader header;
+    public ENetProtoAck? ack;
+    public ENetProtoConnect? connect;
+    public ENetProtoVerifyConnect? verifyConnect;
+    public ENetProtoDisconnect? disconnect;
+    public ENetProtoPing? ping;
+    public ENetProtoSendReliable? sendReliable;
+    public ENetProtoSendUnReliable? sendUnReliable;
+    public ENetProtoSendUnsequenced? sendUnseq;
+    public ENetProtoSendFragment? sendFragment;
+    public ENetProtoBandwidthLimit? bandwidthLimit;
+    public ENetProtoThrottleConfigure? throttleConfigure;
 
+    public ENetProto()
+    {//TODO:这个构造函数可能需要改？不需要所有的都new出来吧？
+        this.header = new();
+    }
+}
 
+static class ENetProtoCmdSize
+{
+    public static List<uint> CmdSize = Init();
 
+    private static List<uint> Init()
+    {
+        List<uint> cmdSizeList = new List<uint>();
+
+        cmdSizeList.Add(0);
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<ENetProtoAck>()));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoConnect())));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoVerifyConnect())));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoDisconnect())));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoPing())));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoSendReliable())));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoSendUnReliable())));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoSendUnsequenced())));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoSendUnsequenced())));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoBandwidthLimit())));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoThrottleConfigure())));
+        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf(new ENetProtoSendFragment())));
+
+        return cmdSizeList;
+    }
+};
 
 
 
