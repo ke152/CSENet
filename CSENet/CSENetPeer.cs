@@ -2,7 +2,7 @@
 
 namespace CSENet;
 
-enum CSENetPeerState
+public enum CSENetPeerState
 {
     Disconnected,
     Connecting,
@@ -16,7 +16,7 @@ enum CSENetPeerState
     Zombie,
 };
 
-internal class CSENetPeer
+public class CSENetPeer
 {
     public CSENetHost? host;
     public uint outPeerID;

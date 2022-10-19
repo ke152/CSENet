@@ -1,12 +1,12 @@
 ﻿namespace CSENet;
 
-class CSENetAckCmd
+public class CSENetAckCmd
 {
     public uint sentTime;
     public CSENetProtoCmdHeader cmdHeader = new();
 };
 
-class CSENetOutCmd
+public class CSENetOutCmd
 {
     public uint reliableSeqNum;
     public uint unreliableSeqNum;
@@ -21,7 +21,7 @@ class CSENetOutCmd
     public CSENetPacket? packet;
 };
 
-class CSENetInCmd
+public class CSENetInCmd
 {
     public uint reliableSeqNum;
     public uint unreliableSeqNum;

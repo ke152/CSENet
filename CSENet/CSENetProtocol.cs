@@ -2,7 +2,7 @@
 
 namespace CSENet;
 
-enum CSENetProtoFlag
+public enum CSENetProtoFlag
 {
     CmdFlagUnSeq = (1 << 6),
     CmdFlagAck = (1 << 7),
@@ -15,7 +15,7 @@ enum CSENetProtoFlag
     HeaderSessionShift = 12
 };
 
-enum CSENetProtoCmdType
+public enum CSENetProtoCmdType
 {
     None = 0,
     Ack = 1,
@@ -34,13 +34,13 @@ enum CSENetProtoCmdType
     Mask = 15
 };
 
-class CSENetProtoHeader
+public class CSENetProtoHeader
 {
     public uint peerID;
     public uint sentTime;
 };
 
-class CSENetProtoCmdHeader
+public class CSENetProtoCmdHeader
 {
     public int cmdFlag = 0;
     public uint channelID;
@@ -61,13 +61,13 @@ class CSENetProtoCmdHeader
     }
 }
 
-class CSENetProtoAck
+public class CSENetProtoAck
 {
     public uint receivedReliableSeqNum = 0;
     public uint receivedSentTime = 0;
 };
 
-class CSENetProtoConnect
+public class CSENetProtoConnect
 {
     public uint outPeerID = 0;
     public uint inSessionID = 0;
@@ -84,7 +84,7 @@ class CSENetProtoConnect
     public uint data = 0;
 };
 
-class CSENetProtoVerifyConnect
+public class CSENetProtoVerifyConnect
 {
     public uint outPeerID = 0;
     public uint inSessionID = 0;
@@ -100,46 +100,46 @@ class CSENetProtoVerifyConnect
     public uint connectID = 0;
 };
 
-class CSENetProtoBandwidthLimit
+public class CSENetProtoBandwidthLimit
 {
     public uint inBandwidth = 0;
     public uint outBandwidth = 0;
 };
 
-class CSENetProtoThrottleConfigure
+public class CSENetProtoThrottleConfigure
 {
     public uint packetThrottleInterval = 0;
     public uint packetThrottleAcceleration = 0;
     public uint packetThrottleDeceleration = 0;
 };
 
-class CSENetProtoDisconnect
+public class CSENetProtoDisconnect
 {
     public uint data = 0;
 };
 
-class CSENetProtoPing
+public class CSENetProtoPing
 {
 };
 
-class CSENetProtoSendReliable
+public class CSENetProtoSendReliable
 {
     public uint dataLength = 0;
 };
 
-class CSENetProtoSendUnReliable
+public class CSENetProtoSendUnReliable
 {
     public uint dataLength = 0;
     public uint unreliableSeqNum = 0;
 };
 
-class CSENetProtoSendUnsequenced
+public class CSENetProtoSendUnsequenced
 {
     public uint unseqGroup = 0;
     public uint dataLength = 0;
 };
 
-class CSENetProtoSendFragment
+public class CSENetProtoSendFragment
 {
     public uint startSeqNum = 0;
     public uint dataLength = 0;
@@ -149,7 +149,7 @@ class CSENetProtoSendFragment
     public uint fragmentOffset = 0;
 };
 
-internal class CSENetProto
+public class CSENetProto
 {
     public CSENetProtoCmdHeader header;
     public CSENetProtoAck? ack;

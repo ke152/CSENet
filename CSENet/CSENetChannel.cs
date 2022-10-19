@@ -1,6 +1,6 @@
 ﻿namespace CSENet;
 
-class CSENetChannel
+public class CSENetChannel
 {
     public uint outReliableSeqNum = 0;
     public uint outUnreliableSeqNum = 0;

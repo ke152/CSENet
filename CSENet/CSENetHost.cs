@@ -2,7 +2,7 @@
 
 namespace CSENet;
 
-internal class CSENetHost
+public class CSENetHost
 {
     public CSENetSocket? socket;
     public IPEndPoint? address;                     /**< Internet address of the host */
@@ -121,4 +121,51 @@ internal class CSENetHost
             currentPeer.Reset();
         }
     }
+
+    public void Destroy()
+    {
+        this.socket = null;
+
+        if (this.peers == null) 
+            return;
+
+        foreach (var peer in this.peers)
+        {
+            peer.Reset();
+        }
+
+        this.peers = null;
+    }
+
+    public uint Random()
+    {
+        uint n = (this.randomSeed += 0x6D2B79F5U);
+        n = (n ^ (n >> 15)) * (n | 1U);
+        n ^= n + (n ^ (n >> 7)) * (n | 61U);
+        return n ^ (n >> 14);
+    }
+
+    public void ChannelLimit(uint channelLimit)
+    {
+        if (channelLimit > 0 || channelLimit > CSENetDef.ProtoMaxChannelCount)
+            channelLimit = CSENetDef.ProtoMaxChannelCount;
+        else if (channelLimit < CSENetDef.ProtoMinChannelCount)
+                channelLimit = CSENetDef.ProtoMinChannelCount;
+
+        this.channelLimit = channelLimit;
+    }
+
+
+    public void BandwidthLimit(uint incomingBandwidth, uint outgoingBandwidth)
+    {
+        this.inBandwidth = incomingBandwidth;
+        this.outBandwidth = outgoingBandwidth;
+        this.recalculateBandwidthLimits = 1;
+    }
+
+
+
+
+
+
 }

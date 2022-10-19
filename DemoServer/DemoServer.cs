@@ -1,6 +1,11 @@
 ﻿using CSENet;
 using System.Net;
 
+
+CSENetHost host = new();
+host.Create(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 19001), 3, 3, 0, 0);
+
+
 CSENetSocket skt = new();
 skt.Bind("127.0.0.1", 18001);
 
