@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Runtime.InteropServices;
 
 namespace CSENet;
 
@@ -250,5 +251,73 @@ public class CSENetPeer
                 break;
         }
         outCmds.Add(outCmd);
+    }
+
+    //TODO:处理所有0引用的函数
+    //TODO:直接Clear不需要进行函数调用
+    public static void ResetCmds(List<CSENetOutCmd> list)
+    {
+        list.Clear();
+    }
+
+    public static void RemoveInCmds(List<CSENetInCmd> list, CSENetInCmd? startCmd, CSENetInCmd? endCmd, CSENetInCmd? excludeCmd)
+    {
+        if (list == null || startCmd == null || endCmd == null) return;
+        if (list.Count == 0) return;
+
+        CSENetInCmd currCmd;
+        int i = 0;
+        bool canDelete = false;
+        while (i < list.Count)
+        {
+            currCmd = list[i];
+            if (currCmd == startCmd) canDelete = true;
+            if (currCmd == endCmd) canDelete = false;
+
+            if (canDelete && currCmd != excludeCmd)
+            {
+                list.Remove(currCmd);
+                continue;
+            }
+
+            i++;
+        }
+    }
+
+    public void OnConnect()
+    {
+        if (state !=CSENetPeerState.Connected && state != CSENetPeerState.DisconnectLater)
+        {
+            if (this.host == null) return;
+
+            if (inBandwidth != 0)
+                ++this.host.bandwidthLimitedPeers;
+
+            ++this.host.connectedPeers;
+        }
+    }
+
+    public void QueueAck(CSENetProtoCmdHeader cmdHeader, uint sentTime)
+    {
+        if (cmdHeader.channelID < channels?.Length)
+        {
+            CSENetChannel channel = channels[cmdHeader.channelID];
+            uint reliableWindow = cmdHeader.reliableSeqNum / Convert.ToUInt32(CSENetDef.PeerReliableWindowSize),
+                        currentWindow = channel.inReliableSeqNum / Convert.ToUInt32(CSENetDef.PeerReliableWindowSize);
+
+            if (cmdHeader.reliableSeqNum < channel.inReliableSeqNum)
+                reliableWindow += Convert.ToUInt32(CSENetDef.PeerReliableWindows);
+
+            if (reliableWindow >= currentWindow + Convert.ToUInt32(CSENetDef.PeerReliableWindows) - 1 && reliableWindow <= currentWindow + Convert.ToUInt32(CSENetDef.PeerReliableWindows))
+                return;
+        }
+
+        CSENetAckCmd ack = new();
+        ack.sentTime = sentTime;
+        ack.cmdHeader = cmdHeader;
+
+        this.outDataTotal += Marshal.SizeOf<CSENetAckCmd>();
+
+        acknowledgements.Add(ack);
     }
 }
