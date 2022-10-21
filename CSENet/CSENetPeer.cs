@@ -172,4 +172,83 @@ public class CSENetPeer
 
         channels = null;
     }
+
+
+    public void QueueOutgoingCommand(CSENetProto cmd, CSENetPacket? packet, uint offset, uint length)
+    {
+        CSENetOutCmd outCmd = new();
+        outCmd.cmd = cmd;
+        outCmd.fragmentOffset = offset;
+        outCmd.fragmentLength = length;
+        outCmd.packet = packet;
+
+        SetupOutCmd(outCmd);
+    }
+
+    public void SetupOutCmd(CSENetOutCmd outCmd)
+    {
+        outDataTotal += (int)CSENetProtoCmdSize.CmdSize[Convert.ToInt32(outCmd.cmdHeader.cmdFlag & (int)CSENetProtoCmdType.Mask)] + (int)outCmd.fragmentLength;
+
+        if (outCmd.cmdHeader.channelID == 0xFF)
+        {
+            ++outReliableSeqNum;
+
+            outCmd.reliableSeqNum = outReliableSeqNum;
+            outCmd.unreliableSeqNum = 0;
+        }
+        else if (channels != null)
+        {
+            CSENetChannel channel = channels[outCmd.cmdHeader.channelID];
+
+            if ((outCmd.cmdHeader.cmdFlag & (int)CSENetProtoFlag.CmdFlagAck) != 0)
+            {
+                ++channel.outReliableSeqNum;
+                channel.outUnreliableSeqNum = 0;
+
+                outCmd.reliableSeqNum = channel.outReliableSeqNum;
+                outCmd.unreliableSeqNum = 0;
+            }
+            else
+            {
+                if ((outCmd.cmdHeader.cmdFlag & (int)CSENetProtoFlag.CmdFlagUnSeq) != 0)
+                {
+                    ++outUnSeqGroup;
+
+                    outCmd.reliableSeqNum = 0;
+                    outCmd.unreliableSeqNum = 0;
+                }
+                else
+                {
+                    if (outCmd.fragmentOffset == 0)
+                        ++channel.outUnreliableSeqNum;
+
+                    outCmd.reliableSeqNum = channel.outReliableSeqNum;
+                    outCmd.unreliableSeqNum = channel.outUnreliableSeqNum;
+                }
+            }
+        }
+
+        outCmd.sendAttempts = 0;
+        outCmd.sentTime = 0;
+        outCmd.rttTimeout = 0;
+        outCmd.rttTimeoutLimit = 0;
+        outCmd.cmdHeader.reliableSeqNum = CSENetUtils.HostToNetOrder(outCmd.reliableSeqNum);
+
+        switch (outCmd.cmdHeader.cmdFlag & (int)CSENetProtoCmdType.Mask)
+        {
+            case (int)CSENetProtoCmdType.SendUnreliable:
+                if (outCmd.cmd.sendUnReliable != null)
+                    outCmd.cmd.sendUnReliable.unreliableSeqNum = CSENetUtils.HostToNetOrder(outCmd.unreliableSeqNum);
+                break;
+
+            case (int)CSENetProtoCmdType.SendUnseq:
+                if (outCmd.cmd.sendUnseq != null)
+                    outCmd.cmd.sendUnseq.unseqGroup = CSENetUtils.HostToNetOrder(outUnSeqGroup);
+                break;
+
+            default:
+                break;
+        }
+        outCmds.Add(outCmd);
+    }
 }
