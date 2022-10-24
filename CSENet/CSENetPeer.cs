@@ -320,4 +320,101 @@ public class CSENetPeer
 
         acknowledgements.Add(ack);
     }
+
+    //TODO：这个函数可能应该交给channel
+    public void DispatchInUnreliableCmds(CSENetChannel channel, CSENetInCmd? queuedCmd)
+    {
+        if (channel.inUnreliableCmds.Count == 0) return;
+
+        CSENetInCmd startCmd = channel.inUnreliableCmds.First();
+        CSENetInCmd? droppedCmd = startCmd;
+        CSENetInCmd currentCmd = startCmd;
+
+        int i;
+        for (i = 0; i < channel.inUnreliableCmds.Count; i++)
+        {
+            CSENetInCmd inCmd = currentCmd;
+
+            if ((inCmd.cmdHeader.cmdFlag & (int)CSENetProtoCmdType.Mask) == (int)CSENetProtoCmdType.SendUnseq)
+                continue;
+
+            if (inCmd.reliableSeqNum == channel.inReliableSeqNum)
+            {
+                if (inCmd.fragmentsRemaining <= 0)
+                {
+                    channel.inUnreliableSeqNum = inCmd.unreliableSeqNum;
+                    continue;
+                }
+
+                if (startCmd != currentCmd)
+                {
+                    for (int j = 0; j < i; j++)
+                    {
+                        dispatchedCmds.Add(channel.inUnreliableCmds[j]);
+                    }
+
+                    if (!needDispatch)
+                    {
+                        this.host?.dispatchQueue.Add(this);
+                        needDispatch = true;
+                    }
+
+                    droppedCmd = currentCmd;
+                }
+                else
+                if (droppedCmd != currentCmd && i > 0)
+                    droppedCmd = channel.inUnreliableCmds[i - 1];
+            }
+            else
+            {
+                ushort reliableWindow = (ushort)(inCmd.reliableSeqNum / (ushort)CSENetDef.PeerReliableWindowSize),
+                            currentWindow = (ushort)(channel.inReliableSeqNum / (ushort)CSENetDef.PeerReliableWindowSize);
+                if (inCmd.reliableSeqNum < channel.inReliableSeqNum)
+                    reliableWindow += (ushort)CSENetDef.PeerReliableWindows;
+                if (reliableWindow >= currentWindow && reliableWindow < currentWindow + (ushort)CSENetDef.PeerFreeReliableWindows - 1)
+                    break;
+
+                if (i < channel.inUnreliableCmds.Count)
+                {
+                    droppedCmd = channel.inUnreliableCmds[i + 1];
+                }
+                else
+                {
+                    droppedCmd = null;
+                }
+
+                if (startCmd != currentCmd)
+                {
+                    for (int j = 0; j < i; j++)
+                    {
+                        dispatchedCmds.Add(channel.inUnreliableCmds[j]);
+                    }
+
+                    if (!needDispatch)
+                    {
+                        this.host?.dispatchQueue.Add(this);
+                        needDispatch = true;
+                    }
+                }
+            }
+        }
+
+        if (startCmd != currentCmd)
+        {
+            for (int j = 0; j < i; j++)
+            {
+                dispatchedCmds.Add(channel.inUnreliableCmds[j]);
+            }
+
+            if (!needDispatch)
+            {
+                this.host?.dispatchQueue.Add(this);
+                needDispatch = true;
+            }
+
+            droppedCmd = currentCmd;
+        }
+
+        RemoveInCmds(channel.inUnreliableCmds, startCmd, droppedCmd, queuedCmd);
+    }
 }
