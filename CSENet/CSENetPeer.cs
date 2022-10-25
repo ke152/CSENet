@@ -417,4 +417,43 @@ public class CSENetPeer
 
         RemoveInCmds(channel.inUnreliableCmds, startCmd, droppedCmd, queuedCmd);
     }
+
+    public void DispatchInReliableCmds(CSENetChannel channel, CSENetInCmd? queuedCmd)
+    {
+        if (channel.inReliableCmds.Count == 0) return;
+
+        CSENetInCmd currentCmd = channel.inReliableCmds[0];
+
+        int i;
+        for (i = 0; i < channel.inReliableCmds.Count; i++)
+        {
+            currentCmd = channel.inReliableCmds[i];
+
+            if (currentCmd.fragmentsRemaining > 0 ||
+                currentCmd.reliableSeqNum != channel.inReliableSeqNum + 1)
+                break;
+
+            channel.inReliableSeqNum = currentCmd.reliableSeqNum;
+
+            if (currentCmd.fragmentCount > 0)
+                channel.inReliableSeqNum += currentCmd.fragmentCount - 1;
+        }
+
+        if (currentCmd == null) return;
+
+        channel.inUnreliableSeqNum = 0;
+        for (int j = 0; j < i; j++)
+        {
+            dispatchedCmds.Add(channel.inReliableCmds[j]);
+        }
+
+        if (!this.needDispatch)
+        {
+            this.host?.dispatchQueue.Add(this);
+            needDispatch = true;
+        }
+
+        DispatchInUnreliableCmds(channel, queuedCmd);
+    }
+
 }
