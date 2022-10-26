@@ -456,4 +456,49 @@ public class CSENetPeer
         DispatchInUnreliableCmds(channel, queuedCmd);
     }
 
+    public CSENetPacket? Receive(ref uint channelID)
+    {
+        CSENetInCmd inCmd;
+        CSENetPacket? packet;
+
+        if (this.dispatchedCmds == null || this.dispatchedCmds.Count == 0)
+            return null;
+
+        inCmd = this.dispatchedCmds.First();
+
+        channelID = inCmd.cmdHeader.channelID;
+
+        packet = inCmd.packet;
+
+        if (packet != null)
+        {
+            this.totalWaitingData -= packet.DataLength;
+        }
+
+        return packet;
+    }
+    public void Ping()
+    {
+        CSENetProto command = new();
+
+        if (this.state != CSENetPeerState.Connected)
+            return;
+
+        command.header.cmdFlag = (int)CSENetProtoCmdType.Ping | (int)CSENetProtoFlag.CmdFlagAck;//TODO: cmdFlag改成2个不同的标志位
+        command.header.channelID = 0xFF;
+
+        QueueOutgoingCommand(command, null, 0, 0);
+    }
+
+    public void PingInterval(uint pingInterval)//TODO: rename setPingInxxxx
+    {
+        this.pingInterval = pingInterval != 0 ? pingInterval : CSENetDef.PeerPingInterval;
+    }
+
+    public void Timeout(uint timeoutLimit, uint timeoutMinimum, uint timeoutMaximum)//TODO: rename setTimeout
+    {
+        this.timeoutLimit = timeoutLimit != 0 ? timeoutLimit : CSENetDef.PeerTimeoutLimit;
+        this.timeoutMinimum = timeoutMinimum != 0 ? timeoutMinimum : CSENetDef.PeerTimeoutMin;
+        this.timeoutMaximum = timeoutMaximum != 0 ? timeoutMaximum : CSENetDef.PeerTimeoutMax;
+    }
 }
