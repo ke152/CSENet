@@ -456,6 +456,56 @@ public class CSENetPeer
         DispatchInUnreliableCmds(channel, queuedCmd);
     }
 
+    public int Send(uint channelID, CSENetPacket packet)
+    {
+        CSENetChannel channel;
+        CSENetProto cmd = new();
+        uint fragmentLength;
+
+        if (this.state != CSENetPeerState.Connected ||
+            channelID >= this.channels?.Length
+            || this.host == null || packet.DataLength > this.host.maximumPacketSize)
+        {
+            return -1;
+        }
+
+        if (channels == null) return -1;
+
+        channel = channels[Convert.ToInt32(channelID)];
+        fragmentLength = mtu - Convert.ToUInt32(Marshal.SizeOf<CSENetProtoHeader>() + Marshal.SizeOf<CSENetProtoSendFragment>());
+
+        //分片
+        //TODO
+        //不用分片的
+
+        cmd.header.channelID = channelID;
+
+        if ((packet.Flags & ((int)CSENetPacketFlag.Reliable | (int)CSENetPacketFlag.UnSeq)) == (int)CSENetPacketFlag.UnSeq)
+        {
+            cmd.header.cmdFlag = (int)CSENetProtoCmdType.SendUnseq | (int)CSENetProtoFlag.CmdFlagUnSeq;
+            cmd.sendUnseq = new();
+            cmd.sendUnseq.dataLength = (uint)IPAddress.HostToNetworkOrder(packet.DataLength);
+        }
+        else
+        {
+            cmd.sendReliable = new();
+            if ((packet.Flags & (int)CSENetPacketFlag.Reliable) != 0 || channel.outUnreliableSeqNum >= 0xFFFF)
+            {
+                cmd.header.cmdFlag = (int)CSENetProtoCmdType.SendReliable | (int)CSENetProtoFlag.CmdFlagAck;
+                cmd.sendReliable.dataLength = (uint)IPAddress.HostToNetworkOrder(packet.DataLength);
+            }
+            else
+            {
+                cmd.header.cmdFlag = (int)CSENetProtoCmdType.SendReliable;
+                cmd.sendReliable.dataLength = (uint)IPAddress.HostToNetworkOrder(packet.DataLength);
+            }
+        }
+
+        QueueOutgoingCommand(cmd, packet, 0, packet.DataLength);
+
+        return 0;
+    }
+
     public CSENetPacket? Receive(ref uint channelID)
     {
         CSENetInCmd inCmd;

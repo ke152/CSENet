@@ -22,7 +22,7 @@ public class CSENetPacket
     * An ENet data packet that may be sent to or received from a peer. The shown 
     * fields should only be read and never modified. 
     */
-    public int Flags;           /**< bitwise-or of ENetPacketFlag constants */
+    public int Flags;           /**< bitwise-or of ENetPacketFlag constants *///TODO: Flag改成两个，不要用int
     public byte[]? Data;            //allocated data for packet
     public uint DataLength { get { return this.Data == null ? 0 : Convert.ToUInt32(this.Data.Length); } }
 
