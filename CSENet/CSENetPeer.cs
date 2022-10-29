@@ -475,7 +475,69 @@ public class CSENetPeer
         fragmentLength = mtu - Convert.ToUInt32(Marshal.SizeOf<CSENetProtoHeader>() + Marshal.SizeOf<CSENetProtoSendFragment>());
 
         //分片
-        //TODO
+        if (packet.DataLength > fragmentLength)
+        {
+            uint fragmentCount = (packet.DataLength + fragmentLength - 1) / fragmentLength,
+                    fragmentNumber,
+                    fragmentOffset;
+            int cmdNum;
+            uint startSequenceNumber;
+            List<CSENetOutCmd> fragments = new();
+            CSENetOutCmd fragment;
+
+            if (fragmentCount > CSENetDef.ProtoMaxFragmentCount)
+                return -1;
+
+            if ((packet.Flags & ((int)CSENetPacketFlag.UnreliableFragment | (int)CSENetPacketFlag.Reliable)) == (int)CSENetPacketFlag.UnreliableFragment &&
+                channel.outUnreliableSeqNum < 0xFFFF)
+            {
+                cmdNum = (int)CSENetProtoCmdType.SendUnreliableFragment;
+                startSequenceNumber = (uint)IPAddress.HostToNetworkOrder(channel.outUnreliableSeqNum + 1);
+            }
+            else
+            {
+                cmdNum = (int)CSENetProtoCmdType.SendFragment | (int)CSENetProtoFlag.CmdFlagAck;
+                startSequenceNumber = (uint)IPAddress.HostToNetworkOrder(channel.outUnreliableSeqNum + 1);
+            }
+
+            for (fragmentNumber = 0,
+                    fragmentOffset = 0;
+                fragmentOffset < packet.DataLength;
+                ++fragmentNumber,
+                    fragmentOffset += fragmentLength)
+            {
+                if (packet.DataLength - fragmentOffset < fragmentLength)
+                    fragmentLength = packet.DataLength - fragmentOffset;
+
+                fragment = new();
+
+                fragment.fragmentOffset = fragmentOffset;
+                fragment.fragmentLength = fragmentLength;
+                fragment.packet = packet;
+                fragment.cmdHeader.cmdFlag = cmdNum;
+                fragment.cmdHeader.channelID = channelID;
+
+                fragment.cmd.sendFragment = new();
+                fragment.cmd.sendFragment.startSeqNum = startSequenceNumber;
+                fragment.cmd.sendFragment.dataLength = (uint)IPAddress.HostToNetworkOrder(fragmentLength);
+                fragment.cmd.sendFragment.fragmentCount = (uint)IPAddress.HostToNetworkOrder(fragmentCount);
+                fragment.cmd.sendFragment.fragmentNum = (uint)IPAddress.HostToNetworkOrder(fragmentNumber);
+                fragment.cmd.sendFragment.totalLength = (uint)IPAddress.HostToNetworkOrder(packet.DataLength);
+                fragment.cmd.sendFragment.fragmentOffset = (uint)IPAddress.NetworkToHostOrder(fragmentOffset);
+
+                fragments.Add(fragment);
+            }
+
+            while (fragments.Count > 0)
+            {
+                fragment = fragments[0];
+                fragments.RemoveAt(0);
+
+                SetupOutCmd(fragment);
+            }
+
+            return 0;
+        }
         //不用分片的
 
         cmd.header.channelID = channelID;
