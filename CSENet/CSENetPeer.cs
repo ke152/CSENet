@@ -642,7 +642,87 @@ public class CSENetPeer
                 goto discardcmd;
         }
 
-        //TODO: switch code
+        switch (cmdHeader.cmdFlag & (int)CSENetProtoCmdType.Mask)
+        {
+            case (int)CSENetProtoCmdType.SendFragment:
+            case (int)CSENetProtoCmdType.SendReliable:
+                if (reliableSeqNum == channel.inReliableSeqNum)
+                    goto discardcmd;
+
+                for (int i = channel.inReliableCmds.Count; i >= 0; i--)
+                {
+                    currCmd = channel.inReliableCmds[i];
+                    inCmd = currCmd;
+
+                    if (reliableSeqNum >= channel.inReliableSeqNum)
+                    {
+                        if (inCmd.reliableSeqNum < channel.inReliableSeqNum)
+                            continue;
+                    }
+                    else
+                    if (inCmd.reliableSeqNum >= channel.inReliableSeqNum)
+                        break;
+
+                    if (inCmd.reliableSeqNum <= reliableSeqNum)
+                    {
+                        if (inCmd.reliableSeqNum < reliableSeqNum)
+                            break;
+
+                        goto discardcmd;
+                    }
+                }
+                break;
+
+            case (int)CSENetProtoCmdType.SendUnreliable:
+            case (int)CSENetProtoCmdType.SendUnreliableFragment:
+                unreliableSeqNum = CSENetUtils.NetToHostOrder(sendUnreliableSeqNum);
+
+                if (reliableSeqNum == channel.inReliableSeqNum &&
+                    unreliableSeqNum <= channel.inUnreliableSeqNum)
+                    goto discardcmd;
+
+                for (int i = channel.inUnreliableCmds.Count; i >= 0; i--)
+                {
+                    currCmd = channel.inReliableCmds[i];
+                    inCmd = currCmd;
+
+                    if ((cmdHeader.cmdFlag & (int)CSENetProtoCmdType.Mask) == (int)CSENetProtoCmdType.SendUnreliable)
+                        continue;
+
+                    if (reliableSeqNum >= channel.inReliableSeqNum)
+                    {
+                        if (inCmd.reliableSeqNum < channel.inReliableSeqNum)
+                            continue;
+                    }
+                    else
+                    if (inCmd.reliableSeqNum >= channel.inReliableSeqNum)
+                        break;
+
+                    if (inCmd.reliableSeqNum < reliableSeqNum)
+                        break;
+
+                    if (inCmd.reliableSeqNum > reliableSeqNum)
+                        continue;
+
+                    if (inCmd.unreliableSeqNum <= unreliableSeqNum)
+                    {
+                        if (inCmd.unreliableSeqNum < unreliableSeqNum)
+                            break;
+
+                        goto discardcmd;
+                    }
+                }
+                break;
+
+            case (int)CSENetProtoCmdType.SendUnseq:
+                currCmd = channel.inUnreliableCmds.Last();
+                break;
+
+            default:
+                goto discardcmd;
+        }
+
+    //TODO: after switch code
 
     discardcmd:
         if (fragmentCount > 0)
