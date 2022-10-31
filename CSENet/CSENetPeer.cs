@@ -613,4 +613,45 @@ public class CSENetPeer
         this.timeoutMinimum = timeoutMinimum != 0 ? timeoutMinimum : CSENetDef.PeerTimeoutMin;
         this.timeoutMaximum = timeoutMaximum != 0 ? timeoutMaximum : CSENetDef.PeerTimeoutMax;
     }
+
+    public CSENetInCmd? QueueInCmd(CSENetProtoCmdHeader cmdHeader, byte[]? data, uint dataLength, int flags, uint fragmentCount, uint sendUnreliableSeqNum = 0)
+    {
+        CSENetInCmd dummyCmd = new();
+
+        if (channels == null) return null;
+        CSENetChannel channel = channels[cmdHeader.channelID];
+        uint unreliableSeqNum = 0, reliableSeqNum = 0;
+        uint reliableWindow, currentWindow;
+        CSENetInCmd inCmd;
+        CSENetInCmd? currCmd = null;
+        CSENetPacket packet;
+
+        if (state == CSENetPeerState.DisconnectLater)
+            goto discardcmd;
+
+        if ((cmdHeader.cmdFlag & (int)CSENetProtoCmdType.SendUnseq) != 0)
+        {
+            reliableSeqNum = cmdHeader.reliableSeqNum;
+            reliableWindow = reliableSeqNum / CSENetDef.PeerReliableWindowSize;
+            currentWindow = channel.inReliableSeqNum / CSENetDef.PeerReliableWindowSize;
+
+            if (reliableSeqNum < channel.inReliableSeqNum)
+                reliableWindow += CSENetDef.PeerReliableWindows;
+
+            if (reliableWindow < currentWindow || reliableWindow >= currentWindow + CSENetDef.PeerReliableWindows - 1)
+                goto discardcmd;
+        }
+
+        //TODO: switch code
+
+    discardcmd:
+        if (fragmentCount > 0)
+            goto notifyError;
+
+        return dummyCmd;
+
+    notifyError:
+        return null;
+    }
+
 }
