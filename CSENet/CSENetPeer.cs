@@ -722,7 +722,48 @@ public class CSENetPeer
                 goto discardcmd;
         }
 
-    //TODO: after switch code
+        if (totalWaitingData >= this.host?.maximumWaitingData)
+            goto notifyError;
+
+        packet = new(data, flags);
+        if (packet == null)
+            goto notifyError;
+
+        inCmd = new();
+
+        inCmd.reliableSeqNum = cmdHeader.reliableSeqNum;
+        inCmd.unreliableSeqNum = unreliableSeqNum & 0xFFFF;
+        inCmd.cmdHeader = cmdHeader;
+        inCmd.fragmentCount = fragmentCount;
+        inCmd.fragmentsRemaining = fragmentCount;
+        inCmd.packet = packet;
+        inCmd.fragments = null;
+
+        if (fragmentCount > 0 && fragmentCount <= CSENetDef.ProtoMaxFragmentCount)
+            inCmd.fragments = new uint[(fragmentCount + 31) / 32];
+
+        if (packet != null && packet.Data != null)
+        {
+            totalWaitingData += Convert.ToUInt32(packet.Data.Length);
+        }
+
+        if (currCmd != null)
+        {
+            channel.inReliableCmds.Insert(channel.inReliableCmds.IndexOf(currCmd) + 1, inCmd);
+        }
+
+        switch (cmdHeader.cmdFlag & (int)CSENetProtoCmdType.Mask)
+        {
+            case (int)CSENetProtoCmdType.SendFragment:
+            case (int)CSENetProtoCmdType.SendReliable:
+                DispatchInReliableCmds(channel, inCmd);
+                break;
+            default:
+                DispatchInUnreliableCmds(channel, inCmd);
+                break;
+        }
+
+        return inCmd;
 
     discardcmd:
         if (fragmentCount > 0)
