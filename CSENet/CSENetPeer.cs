@@ -775,4 +775,50 @@ public class CSENetPeer
         return null;
     }
 
+    public void ThrottleConfigure(uint interval, uint acceleration, uint deceleration)
+    {
+        CSENetProto command = new();
+
+        this.packetThrottleInterval = interval;
+        this.packetThrottleAcceleration = acceleration;
+        this.packetThrottleDeceleration = deceleration;
+
+        command.header.cmdFlag = (int)CSENetProtoCmdType.ThrottleConfig | (int)CSENetProtoFlag.CmdFlagAck;
+        command.header.channelID = 0xFF;
+
+        command.throttleConfigure = new();
+        command.throttleConfigure.packetThrottleInterval = (uint)IPAddress.HostToNetworkOrder(interval);
+        command.throttleConfigure.packetThrottleAcceleration = (uint)IPAddress.HostToNetworkOrder(acceleration);
+        command.throttleConfigure.packetThrottleDeceleration = (uint)IPAddress.HostToNetworkOrder(deceleration);
+
+        QueueOutgoingCommand(command, null, 0, 0);
+    }
+
+    public int Throttle(long rtt)
+    {
+        if (this.lastRoundTripTime <= this.lastRTTVariance)
+        {
+            this.packetThrottle = this.packetThrottleLimit;
+        }
+        else if (rtt <= this.lastRoundTripTime)
+        {
+            this.packetThrottle += this.packetThrottleAcceleration;
+
+            if (this.packetThrottle > this.packetThrottleLimit)
+                this.packetThrottle = this.packetThrottleLimit;
+
+            return 1;
+        }
+        else if (rtt > this.lastRoundTripTime + 2 * this.lastRTTVariance)
+        {
+            if (this.packetThrottle > this.packetThrottleDeceleration)
+                this.packetThrottle -= this.packetThrottleDeceleration;
+            else
+                this.packetThrottle = 0;
+
+            return -1;
+        }
+
+        return 0;
+    }
 }
