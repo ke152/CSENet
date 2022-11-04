@@ -839,7 +839,7 @@ public class CSENetPeer
 
             QueueOutgoingCommand(command, null, 0, 0);
 
-            this.host.Flush();
+            this.host?.Flush();
         }
 
         Reset();
@@ -855,5 +855,43 @@ public class CSENetPeer
         }
         else
             Disconnect(data);
+    }
+
+    public void Disconnect(uint data)
+    {
+        CSENetProto command = new();
+
+        if (this.state == CSENetPeerState.Disconnecting ||
+            this.state == CSENetPeerState.Disconnected ||
+            this.state == CSENetPeerState.AckDisconnect ||
+            this.state == CSENetPeerState.Zombie)
+            return;
+
+        ResetQueues();
+
+        command.header.cmdFlag = (int)CSENetProtoCmdType.Disconnect;
+        command.header.channelID = 0xFF;
+
+        command.disconnect = new();
+        command.disconnect.data = (uint)IPAddress.HostToNetworkOrder(data);
+
+        if (this.state == CSENetPeerState.Connected || this.state == CSENetPeerState.DisconnectLater)
+            command.header.cmdFlag |= (int)CSENetProtoFlag.CmdFlagAck;
+        else
+            command.header.cmdFlag |= (int)CSENetProtoFlag.CmdFlagUnSeq;
+
+        QueueOutgoingCommand(command, null, 0, 0);
+
+        if (this.state == CSENetPeerState.Connected || this.state == CSENetPeerState.DisconnectLater)
+        {
+            OnDisconnect();
+
+            this.state = CSENetPeerState.Disconnecting;
+        }
+        else
+        {
+            this.host?.Flush();
+            Reset();
+        }
     }
 }
