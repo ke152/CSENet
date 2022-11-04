@@ -821,4 +821,39 @@ public class CSENetPeer
 
         return 0;
     }
+    public void DisconnectNow(uint data)
+    {
+        CSENetProto command = new();
+
+        if (this.state == CSENetPeerState.Disconnected)
+            return;
+
+        if (this.state != CSENetPeerState.Zombie &&
+            this.state != CSENetPeerState.Disconnecting)
+        {
+            ResetQueues();
+
+            command.header.cmdFlag = (int)CSENetProtoCmdType.Disconnect | (int)CSENetProtoFlag.CmdFlagUnSeq;
+            command.header.channelID = 0xFF;
+            command.disconnect.data = (uint)IPAddress.HostToNetworkOrder(data);
+
+            QueueOutgoingCommand(command, null, 0, 0);
+
+            this.host.Flush();
+        }
+
+        Reset();
+    }
+
+    public void DisconnectLater(uint data)
+    {
+        if ((this.state == CSENetPeerState.Connected || this.state == CSENetPeerState.DisconnectLater) &&
+            this.outCmds.Count != 0 && this.sentReliableCmds.Count == 0)
+        {
+            this.state = CSENetPeerState.DisconnectLater;
+            this.eventData = data;
+        }
+        else
+            Disconnect(data);
+    }
 }
