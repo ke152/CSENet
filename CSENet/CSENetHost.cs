@@ -332,7 +332,62 @@ public class CSENetHost
         }
     }
 
+    public void Flush()
+    {
+        this.serviceTime = CSENetUtils.TimeGet();
+        ProtoSendOutCmds(null, 0);
+    }
 
+    public void ProtoSendOutCmds(int? a, int b)//TODO:delete
+    {
 
+    }
+
+    public CSENetPeer? Connect(IPEndPoint address, uint channelCount, uint data)
+    {
+        CSENetPeer? currentPeer = null;
+
+        if (channelCount < (int)CSENetDef.ProtoMinChannelCount)
+            channelCount = (int)CSENetDef.ProtoMinChannelCount;
+        else
+        if (channelCount > (int)CSENetDef.ProtoMaxChannelCount)
+            channelCount = (int)CSENetDef.ProtoMaxChannelCount;
+
+        if (this.peers == null)
+        {
+            return null;
+        }
+
+        foreach (var tmpPeer in this.peers)
+        {
+            if (tmpPeer.state == CSENetPeerState.Disconnected)
+            {
+                currentPeer = tmpPeer;
+                break;
+            }
+        }
+
+        if (currentPeer == null)
+            return null;
+
+        currentPeer.channels = new CSENetChannel[channelCount];
+        for (int i = 0; i < currentPeer.channels.Length; i++)
+        {
+            currentPeer.channels[i] = new();
+        }
+
+        currentPeer.state = CSENetPeerState.Connecting;
+        currentPeer.address = address;
+        currentPeer.connectID = Random();
+
+        if (this.outBandwidth == 0)
+            currentPeer.windowSize = (int)CSENetDef.ProtoMaxWindowSize;
+        else
+            currentPeer.windowSize = (this.outBandwidth /
+                                          (uint)CSENetDef.PeerWindowSizeScale) *
+                                            (int)CSENetDef.ProtoMinWindowSize;
+
+        return currentPeer;
+    }
 
 }
