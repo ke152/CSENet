@@ -338,11 +338,6 @@ public class CSENetHost
         ProtoSendOutCmds(null, 0);
     }
 
-    public void ProtoSendOutCmds(int? a, int b)//TODO:delete
-    {
-
-    }
-
     public CSENetPeer? Connect(IPEndPoint address, uint channelCount, uint data)
     {
         CSENetPeer? currentPeer = null;
@@ -387,7 +382,60 @@ public class CSENetHost
                                           (uint)CSENetDef.PeerWindowSizeScale) *
                                             (int)CSENetDef.ProtoMinWindowSize;
 
+        if (currentPeer.windowSize < (int)CSENetDef.ProtoMinWindowSize)
+            currentPeer.windowSize = (int)CSENetDef.ProtoMinWindowSize;
+        else
+        if (currentPeer.windowSize > (int)CSENetDef.ProtoMaxWindowSize)
+            currentPeer.windowSize = (int)CSENetDef.ProtoMaxWindowSize;
+
+        if (currentPeer.channels != null)
+        {
+            for (int i = 0; i < currentPeer.channels.Length; i++)
+            {
+                var channel = currentPeer.channels[i];
+
+                channel.outReliableSeqNum = 0;
+                channel.outUnreliableSeqNum = 0;
+                channel.inReliableSeqNum = 0;
+                channel.inUnreliableSeqNum = 0;
+
+                channel.inReliableCmds.Clear();
+                channel.inUnreliableCmds.Clear();
+
+                channel.usedReliableWindows = 0;
+            }
+        }
+
+        CSENetProto command = new();
+        command.header.cmdFlag = (int)CSENetProtoCmdType.Connect | (int)CSENetProtoFlag.CmdFlagAck;
+        command.header.channelID = 0xFF;
+        command.connect = new();
+        command.connect.outPeerID = (uint)IPAddress.HostToNetworkOrder(currentPeer.inPeerID);
+        if (currentPeer != null)
+        {
+            command.connect.inSessionID = currentPeer.inSessionID;
+            command.connect.outSessionID = currentPeer.outSessionID;
+            command.connect.mtu = (uint)IPAddress.HostToNetworkOrder(currentPeer.mtu);
+            command.connect.windowSize = (uint)IPAddress.HostToNetworkOrder(currentPeer.windowSize);
+            command.connect.packetThrottleInterval = (uint)IPAddress.HostToNetworkOrder(currentPeer.packetThrottleInterval);
+            command.connect.packetThrottleAcceleration = (uint)IPAddress.HostToNetworkOrder(currentPeer.packetThrottleAcceleration);
+            command.connect.packetThrottleDeceleration = (uint)IPAddress.HostToNetworkOrder(currentPeer.packetThrottleDeceleration);
+            command.connect.connectID = currentPeer.connectID;
+        }
+        command.connect.channelCount = (uint)IPAddress.HostToNetworkOrder(channelCount);
+        command.connect.inBandwidth = (uint)IPAddress.HostToNetworkOrder(this.inBandwidth);
+        command.connect.outBandwidth = (uint)IPAddress.HostToNetworkOrder(this.outBandwidth);
+        command.connect.data = (uint)IPAddress.HostToNetworkOrder(data);
+
+        currentPeer?.QueueOutgoingCommand(command, null, 0, 0);
+
         return currentPeer;
     }
 
+
+
+    public void ProtoSendOutCmds(int? a, int b)//TODO:delete
+    {
+
+    }
 }
