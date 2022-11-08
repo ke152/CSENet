@@ -8,7 +8,7 @@ enum CSENetEventType
     Recv = 3
 }
 
-internal class CSENetEvent
+public class CSENetEvent
 {
         public CSENetEventType type = CSENetEventType.None;      /**< type of the event */
         public CSENetPeer? peer = null;      /**< peer that generated a connect, disconnect or receive event */

@@ -432,10 +432,52 @@ public class CSENetHost
         return currentPeer;
     }
 
+    public void Broadcast(CSENetHost host, uint channelID, CSENetPacket packet)
+    {
+        if (this.peers == null)
+            return;
 
+        foreach (var currentPeer in this.peers)
+        {
+            if (currentPeer.state != CSENetPeerState.Connected)
+                continue;
+
+            currentPeer.Send(channelID, packet);
+        }
+    }
+
+    public int CheckEvents(CSENetEvent? @event)
+    {
+        if (@event == null) return -1;
+
+        @event.type = CSENetEventType.None;
+        @event.peer = null;
+        @event.packet = null;
+
+        return ProtoDispatchIncomingCommands(ref @event);
+    }
+
+    public void ProtoChangeState(CSENetPeer peer, CSENetPeerState state)
+    {
+        if (state == CSENetPeerState.Connected || state == CSENetPeerState.DisconnectLater)
+            peer.OnConnect();
+        else
+            peer.OnDisconnect();
+
+        peer.state = state;
+    }
+
+    #region proto
 
     public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
 
     }
+
+    public int ProtoDispatchIncomingCommands(ref CSENetEvent @event)
+    {
+        return 0;
+    }
+
+    #endregion
 }
