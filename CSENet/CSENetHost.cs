@@ -457,6 +457,8 @@ public class CSENetHost
         return ProtoDispatchIncomingCommands(ref @event);
     }
 
+    #region proto
+
     public void ProtoChangeState(CSENetPeer peer, CSENetPeerState state)
     {
         if (state == CSENetPeerState.Connected || state == CSENetPeerState.DisconnectLater)
@@ -467,7 +469,47 @@ public class CSENetHost
         peer.state = state;
     }
 
-    #region proto
+
+    public void ProtoDispatchState(CSENetPeer peer, CSENetPeerState state)
+    {
+        ProtoChangeState(peer, state);
+
+        if (!(peer.needDispatch))
+        {
+            this.dispatchQueue.Add(peer);
+            peer.needDispatch = true;
+        }
+    }
+
+    public void ProtoNotifyConnect(CSENetPeer peer, CSENetEvent? @event)
+    {
+        this.recalculateBandwidthLimits = 1;
+
+        if (@event != null)
+        {
+            ProtoChangeState(peer, CSENetPeerState.Connected);
+
+            @event.type = CSENetEventType.Connect;
+            @event.peer = peer;
+            @event.data = peer.@eventData;
+        }
+        else
+            ProtoDispatchState(peer, peer.state == CSENetPeerState.Connecting ? CSENetPeerState.ConnectionSucceed : CSENetPeerState.ConnectionPending);
+    }
+
+    public void ProtoRemoveSentUnreliableCommands(CSENetPeer peer)
+    {
+        if (peer.sentUnreliableCmds.Count == 0)
+            return;
+
+        peer.sentUnreliableCmds?.Clear();
+
+        if (peer.state == CSENetPeerState.DisconnectLater &&
+            peer.outCmds.Count == 0 &&
+            peer.sentReliableCmds.Count == 0)
+            peer.Disconnect(peer.@eventData);
+    }
+
 
     public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
