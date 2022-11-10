@@ -432,7 +432,7 @@ public class CSENetHost
         return currentPeer;
     }
 
-    public void Broadcast(CSENetHost host, uint channelID, CSENetPacket packet)
+    public void Broadcast(uint channelID, CSENetPacket packet)
     {
         if (this.peers == null)
             return;
@@ -481,6 +481,74 @@ public class CSENetHost
         }
     }
 
+    public int ProtoDispatchIncomingCommands(ref CSENetEvent? @event)
+    {
+        if (this.dispatchQueue == null) return -1;
+
+        while (this.dispatchQueue.Count != 0)
+        {
+            CSENetPeer? peer = this.dispatchQueue[0];
+            if (peer == null)
+                continue;
+
+            peer.needDispatch = false;
+
+            switch (peer.state)
+            {
+                case CSENetPeerState.ConnectionPending:
+                case CSENetPeerState.ConnectionSucceed:
+                    ProtoChangeState(peer, CSENetPeerState.Connected);
+                    if (@event != null)
+                    {
+                        @event.type = CSENetEventType.Connect;
+                        @event.peer = peer;
+                        @event.data = peer.eventData;
+                    }
+                    return 1;
+                case CSENetPeerState.Zombie:
+                    this.recalculateBandwidthLimits = 1;
+
+                    if (@event != null)
+                    {
+                        @event.type = CSENetEventType.Disconnect;
+                        @event.peer = peer;
+                        @event.data = peer.@eventData;
+                    }
+
+                    peer.Reset();
+                    return 1;
+
+                case CSENetPeerState.Connected:
+                    if (peer.dispatchedCmds.Count == 0)
+                        continue;
+
+                    if (@event != null)
+                    {
+                        @event.packet = peer.Receive(ref @event.channelID);
+                        if (@event.packet == null)
+                            continue;
+
+                        @event.type = CSENetEventType.Recv;
+                        @event.peer = peer;
+                    }
+
+                    if (peer.dispatchedCmds.Count != 0)
+                    {
+                        peer.needDispatch = true;
+
+                        this.dispatchQueue.Add(peer);
+                    }
+
+                    return 1;
+
+                default:
+                    break;
+            }
+        }
+
+        return 0;
+    }
+
     public void ProtoNotifyConnect(CSENetPeer peer, CSENetEvent? @event)
     {
         this.recalculateBandwidthLimits = 1;
@@ -510,16 +578,12 @@ public class CSENetHost
             peer.Disconnect(peer.@eventData);
     }
 
-
     public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
 
     }
 
-    public int ProtoDispatchIncomingCommands(ref CSENetEvent @event)
-    {
-        return 0;
-    }
-
+    
+    
     #endregion
 }
