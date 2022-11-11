@@ -578,6 +578,32 @@ public class CSENetHost
             peer.Disconnect(peer.@eventData);
     }
 
+    public void ProtoNotifyDisconnect(CSENetPeer peer, CSENetEvent? @event)
+    {
+        if (peer.state >= CSENetPeerState.ConnectionPending)
+            this.recalculateBandwidthLimits = 1;
+
+        if (peer.state != CSENetPeerState.Connecting && peer.state < CSENetPeerState.ConnectionSucceed)
+            peer.Reset();
+        else
+        {
+            if (@event != null)
+            {
+                @event.type = CSENetEventType.Disconnect;
+                @event.peer = peer;
+                @event.data = 0;
+
+                peer.Reset();
+            }
+            else
+            {
+                peer.@eventData = 0;
+
+                ProtoDispatchState(peer, CSENetPeerState.Zombie);
+            }
+        }
+    }
+
     public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
 
