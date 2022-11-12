@@ -604,7 +604,53 @@ public class CSENetHost
         }
     }
 
-    public void ProtoSendOutCmds(int? a, int b)//TODO:delete
+    public CSENetProtoCmdType ProtoRemoveSentReliableCommand(CSENetPeer peer, uint reliableSequenceNumber, uint channelID)
+    {
+        CSENetOutCmd? outgoingCommand = null;
+        CSENetProtoCmdType commandNumber = CSENetProtoCmdType.None;
+        int wasSent = 1;
+
+        foreach (var currentCommand in peer.sentReliableCmds)
+        {
+            outgoingCommand = currentCommand;
+
+            if (outgoingCommand?.reliableSeqNum == reliableSequenceNumber &&
+                outgoingCommand?.cmdHeader.channelID == channelID)
+            {
+                peer.sentReliableCmds.Remove(currentCommand);
+                break;
+            }
+        }
+
+        if (outgoingCommand == null)
+        {
+            foreach (var currentCommand in peer.outCmds)
+            {
+                outgoingCommand = currentCommand;
+
+                if ((outgoingCommand?.cmdHeader.cmdFlag & (int)CSENetProtoFlag.CmdFlagAck) != 0)
+                    continue;
+
+                if (outgoingCommand?.sendAttempts < 1) return (int)CSENetProtoCmdType.None;
+
+                if (outgoingCommand?.reliableSeqNum == reliableSequenceNumber &&
+                    outgoingCommand?.cmdHeader.channelID == channelID)
+                {
+                    peer.outCmds.Remove(currentCommand);
+                    break;
+                }
+            }
+
+            if (outgoingCommand == null)
+                return CSENetProtoCmdType.None;
+
+            wasSent = 0;
+
+
+            return commandNumber;
+        }
+
+        public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
 
     }
