@@ -645,12 +645,47 @@ public class CSENetHost
                 return CSENetProtoCmdType.None;
 
             wasSent = 0;
-
-
-            return commandNumber;
         }
 
-        public void ProtoSendOutCmds(int? a, int b)//TODO:delete
+        if (outgoingCommand == null)
+            return CSENetProtoCmdType.None;
+
+        if (channelID < peer.ChannelCount && peer.channels != null)
+        {
+            CSENetChannel channel = peer.channels[channelID];
+            uint reliableWindow = reliableSequenceNumber / (uint)CSENetDef.PeerReliableWindowSize;
+            if (channel.reliableWindows[reliableWindow] > 0)
+            {
+                --channel.reliableWindows[reliableWindow];
+                if (channel.reliableWindows[reliableWindow] != 0)
+                    channel.usedReliableWindows &= ~(1 << (int)reliableWindow);
+            }
+        }
+
+        commandNumber = (CSENetProtoCmdType)(outgoingCommand.cmdHeader.cmdFlag & (int)CSENetProtoCmdType.Mask);
+
+        if (outgoingCommand.packet != null)
+        {
+            if (wasSent != 0)
+                peer.reliableDataInTransit -= outgoingCommand.fragmentLength;
+
+            outgoingCommand.packet = null;
+        }
+
+        if (peer.sentReliableCmds.Count == 0)
+            return commandNumber;
+
+        outgoingCommand = peer.sentReliableCmds.First();
+
+        if (outgoingCommand != null)
+        {
+            peer.nextTimeout = outgoingCommand.sentTime + outgoingCommand.rttTimeout;
+        }
+
+        return commandNumber;
+    }
+
+    public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
 
     }
