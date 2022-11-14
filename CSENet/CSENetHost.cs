@@ -685,12 +685,65 @@ public class CSENetHost
         return commandNumber;
     }
 
+    public int ProtoReceiveIncomingCommands(CSENetEvent? @event)
+    {
+        if (this.packetData == null || this.packetData[0] == null)
+            return -1;
+
+        int packets;
+
+        for (packets = 0; packets < 256; ++packets)
+        {
+            if (this.packetData == null || this.packetData[0] == null)
+                return -1;
+
+            int receivedLength = 0;
+
+            if (this.socket == null)
+                return -1;
+
+            receivedLength = this.socket.Receive(this.packetData[0], ref this.receivedAddress);
+            
+
+            if (receivedLength < 0)
+                return -1;
+
+            if (receivedLength == 0)
+                return 0;
+
+            this.receivedData = this.packetData[0];
+            this.receivedDataLength = receivedLength;
+
+            this.totalReceivedData += receivedLength;
+            this.totalReceivedPackets++;
+
+            switch (ProtoHandleIncomingCommands(@event))
+            {
+                case 1:
+                    return 1;
+
+                case -1:
+                    return -1;
+
+                default:
+                    break;
+            }
+        }
+
+        return 0;
+    }
+
     public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
 
     }
 
-    
-    
+    public int ProtoHandleIncomingCommands(CSENetEvent? @event)//TODO:delete
+    {
+        return 0;
+    }
+
+
+
     #endregion
 }
