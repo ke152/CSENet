@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Runtime.InteropServices;
 
 namespace CSENet;
 
@@ -733,17 +734,80 @@ public class CSENetHost
         return 0;
     }
 
-    public void ProtoSendOutCmds(int? a, int b)//TODO:delete
-    {
-
-    }
+    #region Proto Handle
 
     public int ProtoHandleIncomingCommands(CSENetEvent? @event)//TODO:delete
     {
+        CSENetProtoHeader header;
+        CSENetProtoCmdHeader commandHeader;
+        CSENetPeer? peer = null;
+        int currentDataIdx = 0;
+        int headerSize = Marshal.SizeOf<CSENetProtoHeader>();
+        uint peerID, flags;
+        uint sessionID;
+
+        if (this.receivedData == null)
+        {
+            return -1;
+        }
+
+        if (headerSize > this.receivedDataLength)
+        {
+            return 0;
+        }
+
+        byte[] headerBytes = CSENetUtils.SubBytes(this.receivedData, 0, headerSize);
+
+        header = CSENetUtils.DeSerialize<CSENetProtoHeader>(headerBytes);
+
+        peerID = CSENetUtils.NetToHostOrder(header.peerID);
+        sessionID = (peerID & (int)CSENetProtoFlag.HeaderSessionMask) >> (int)CSENetProtoFlag.HeaderSessionShift;
+        flags = peerID & (int)CSENetProtoFlag.HeaderFalgMASK;
+        peerID &= ~((uint)CSENetProtoFlag.HeaderFalgMASK | (uint)CSENetProtoFlag.HeaderSessionMask);
+
+        //TODO：这里最后得0，是原先(uint)&((ENetProtoHeader*)0)->sentTime;，不是很理解，先用0代替
+        headerSize = (flags & (int)CSENetProtoFlag.HeaderFalgSentTime) != 0 ? (int)headerSize : 0;
+
+        if (peerID == (int)CSENetDef.ProtoMaxPeerID)
+            peer = null;
+        else if (peerID >= this.peerCount)
+            return 0;
+        else
+        {
+            if (this.peers != null && peerID < this.peers.Length)
+            {
+
+                peer = this.peers[peerID];
+                byte[]? hostIP = peer.address?.Address?.GetAddressBytes();
+                bool isBroadcast = false;
+                if (hostIP != null)
+                {
+                    isBroadcast = hostIP[0] != 255 && hostIP[1] != 255 && hostIP[2] != 255 && hostIP[3] != 255;
+                }
+
+                if (peer.state == CSENetPeerState.Disconnected ||
+                    peer.state == CSENetPeerState.Zombie ||
+                    ((this.receivedAddress?.Address?.GetAddressBytes() != peer.address?.Address?.GetAddressBytes() ||
+                      this.receivedAddress?.Port != peer.address?.Port) &&
+                      !isBroadcast) ||
+                    (peer.outPeerID < (int)CSENetDef.ProtoMaxPeerID &&
+                     sessionID != peer.inSessionID))
+                    return 0;
+            }
+        }
+
+
         return 0;
     }
 
 
+
+
+
+    public void ProtoSendOutCmds(int? a, int b)//TODO:delete
+    {
+
+    }
 
     #endregion
 }
