@@ -738,8 +738,8 @@ public class CSENetHost
 
     public int ProtoHandleIncomingCommands(CSENetEvent? @event)//TODO:delete
     {
-        CSENetProtoHeader header;
-        CSENetProtoCmdHeader commandHeader;
+        CSENetProtoHeader? header;
+        CSENetProtoCmdHeader? commandHeader;
         CSENetPeer? peer = null;
         int currentDataIdx = 0;
         int headerSize = Marshal.SizeOf<CSENetProtoHeader>();
@@ -796,6 +796,78 @@ public class CSENetHost
             }
         }
 
+        if (peer != null && peer.address != null && this.receivedAddress != null)
+        {
+            peer.address.Address = this.receivedAddress.Address;
+            peer.address.Port = this.receivedAddress.Port;
+            peer.inDataTotal += this.receivedDataLength;
+        }
+
+        currentDataIdx = headerSize;
+
+        while (currentDataIdx < this.receivedDataLength)
+        {
+            int commandNumber;
+            int commandSize;
+
+
+            if (currentDataIdx + Marshal.SizeOf<CSENetProtoCmdHeader>() > this.receivedDataLength)//TODO:所有sizeof都用这种形式
+                break;
+
+            byte[] objBytes = CSENetUtils.SubBytes(this.receivedData, currentDataIdx, Marshal.SizeOf<CSENetProtoCmdHeader>());
+            commandHeader = CSENetUtils.DeSerialize<CSENetProtoCmdHeader>(objBytes);
+
+            commandNumber = commandHeader.cmdFlag & (int)CSENetProtoCmdType.Mask;
+            if (commandNumber >= (int)CSENetProtoCmdType.Count)
+                break;
+
+            commandSize = Convert.ToInt32(CSENetProtoCmdSize.CmdSize[commandNumber]);
+            if (commandSize == 0 || currentDataIdx + commandSize > this.receivedDataLength)
+                break;
+
+            int commandStartIdx = currentDataIdx;
+            currentDataIdx += commandSize;
+
+            if (peer == null && commandNumber != (int)CSENetProtoCmdType.Connect)
+                break;
+
+            commandHeader.reliableSeqNum = CSENetUtils.NetToHostOrder(commandHeader.reliableSeqNum);
+
+            //TODO：switch-case
+
+            if (peer != null &&
+                (commandHeader.cmdFlag & (int)CSENetProtoFlag.CmdFlagAck) != 0)
+            {
+                uint sentTime;
+
+                if ((flags & (int)CSENetProtoFlag.HeaderFalgSentTime) == 0)
+                    break;
+
+                sentTime = CSENetUtils.NetToHostOrder(header.sentTime);
+
+                switch (peer.state)
+                {
+                    case CSENetPeerState.Disconnecting:
+                    case CSENetPeerState.AckConnect:
+                    case CSENetPeerState.Disconnected:
+                    case CSENetPeerState.Zombie:
+                        break;
+
+                    case CSENetPeerState.AckDisconnect:
+                        if ((commandHeader.cmdFlag & (int)CSENetProtoCmdType.Mask) == (int)CSENetProtoCmdType.Disconnect)
+                            peer.QueueAck(commandHeader, sentTime);
+                        break;
+
+                    default:
+                        peer.QueueAck(commandHeader, sentTime);
+                        break;
+                }
+            }
+        }
+
+    commandError:
+        if (@event != null && @event.type != CSENetEventType.None)
+            return 1;
 
         return 0;
     }
@@ -808,6 +880,10 @@ public class CSENetHost
     {
 
     }
+
+    #endregion
+
+
 
     #endregion
 }
