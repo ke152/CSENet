@@ -833,7 +833,74 @@ public class CSENetHost
 
             commandHeader.reliableSeqNum = CSENetUtils.NetToHostOrder(commandHeader.reliableSeqNum);
 
-            //TODO：switch-case
+            switch (commandNumber)
+            {
+                case (int)CSENetProtoCmdType.Ack:
+                    if (peer == null || ProtoHandleAcknowledge(@event, peer, commandHeader, commandStartIdx, commandSize) != 0)
+                        goto commandError;
+                    break;
+
+                case (int)CSENetProtoCmdType.Connect:
+                    if (peer != null)
+                        goto commandError;
+                    peer = ProtoHandleConnect(commandHeader, commandStartIdx, commandSize);
+                    if (peer == null)
+                        goto commandError;
+                    break;
+
+                case (int)CSENetProtoCmdType.VerifyConnect:
+                    if (peer == null || ProtoHandleVerifyConnect(@event, peer, commandStartIdx, commandSize) != 0)
+                        goto commandError;
+                    break;
+
+                case (int)CSENetProtoCmdType.Disconnect:
+                    if (peer == null || ProtoHandleDisconnect(commandHeader, peer, commandStartIdx, commandSize) != 0)
+                        goto commandError;
+                    break;
+
+                case (int)CSENetProtoCmdType.Ping:
+                    if (peer == null || ProtoHandlePing(peer) != 0)
+                        goto commandError;
+                    break;
+
+                case (int)CSENetProtoCmdType.SendReliable:
+                    if (peer == null || ProtoHandleSendReliable(commandHeader, peer, commandStartIdx, commandSize, ref currentDataIdx) != 0)
+                        goto commandError;
+                    break;
+
+                case (int)CSENetProtoCmdType.SendFragment:
+                    if (peer == null || ProtoHandleSendFragment(commandHeader, peer, commandStartIdx, commandSize, ref currentDataIdx) != 0)
+                        goto commandError;
+                    break;
+
+                case (int)CSENetProtoCmdType.SendUnreliable:
+                    if (peer == null || ProtoHandleSendUnreliable(commandHeader, peer, commandStartIdx, commandSize, ref currentDataIdx) != 0)
+                        goto commandError;
+                    break;
+
+                case (int)CSENetProtoCmdType.SendUnreliableFragment:
+                    if (peer == null || ProtoHandleSendUnreliableFragment(commandHeader, peer, commandStartIdx, commandSize, ref currentDataIdx) != 0)
+                        goto commandError;
+                    break;
+
+                case (int)CSENetProtoCmdType.SendUnseq:
+                    if (peer == null || ProtoHandleSendUnsequenced(commandHeader, peer, commandStartIdx, commandSize, ref currentDataIdx) != 0)
+                        goto commandError;
+                    break;
+
+                case (int)CSENetProtoCmdType.BandwidthLimit:
+                    if (peer == null || ProtoHandleBandwidthLimit(commandHeader, peer, commandStartIdx, commandSize) != 0)
+                        goto commandError;
+                    break;
+
+                case (int)CSENetProtoCmdType.ThrottleConfig:
+                    if (peer == null || ProtoHandleThrottleConfigure(commandHeader, peer, commandStartIdx, commandSize) != 0)
+                        goto commandError;
+                    break;
+
+                default:
+                    goto commandError;
+            }
 
             if (peer != null &&
                 (commandHeader.cmdFlag & (int)CSENetProtoFlag.CmdFlagAck) != 0)
@@ -873,13 +940,11 @@ public class CSENetHost
     }
 
 
-
-
-
     public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
 
     }
+
 
     #endregion
 
