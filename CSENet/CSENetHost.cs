@@ -939,6 +939,61 @@ public class CSENetHost
         return 0;
     }
 
+    public int ProtoHandleAcknowledge(CSENetEvent? @event, CSENetPeer peer, CSENetProtoCmdHeader commandHeader, int commandStartIdx, int commandSize)
+    {
+        long roundTripTime,
+               receivedSentTime;
+        uint receivedReliableSequenceNumber;
+        CSENetProtoCmdType commandNumber;
+
+        if (this.receivedData == null) return 0;
+
+        CSENetProtoAck? ackCmd = CSENetUtils.DeSerialize<CSENetProtoAck>(CSENetUtils.SubBytes(this.receivedData, commandStartIdx, commandSize));
+        if (ackCmd == null) return 0;
+
+        if (peer.state == CSENetPeerState.Disconnected || peer.state == CSENetPeerState.Zombie)
+            return 0;
+
+        receivedSentTime = CSENetUtils.NetToHostOrder(ackCmd.receivedSentTime);
+        receivedSentTime |= this.serviceTime & 0xFFFF0000;
+        if ((receivedSentTime & 0x8000) > (this.serviceTime & 0x8000))
+            receivedSentTime -= 0x10000;
+
+        if (this.serviceTime < receivedSentTime)
+            return 0;
+
+        roundTripTime = Math.Abs(this.serviceTime - receivedSentTime);
+        roundTripTime = Math.Max(roundTripTime, 1);
+
+        if (peer.lastReceiveTime > 0)
+        {
+            peer.Throttle(roundTripTime);
+
+            peer.rttVariance -= peer.rttVariance / 4;
+
+            if (roundTripTime >= peer.rtt)
+            {
+                long diff = roundTripTime - peer.rtt;
+                peer.rttVariance += diff / 4;
+                peer.rtt += diff / 8;
+            }
+            else
+            {
+                long diff = peer.rtt - roundTripTime;
+                peer.rttVariance += diff / 4;
+                peer.rtt -= diff / 8;
+            }
+        }
+        else
+        {
+            peer.rtt = roundTripTime;
+            peer.rttVariance = (roundTripTime + 1) / 2;
+        }
+
+        return 0;
+    }
+
+
 
     public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
