@@ -990,6 +990,55 @@ public class CSENetHost
             peer.rttVariance = (roundTripTime + 1) / 2;
         }
 
+        if (peer.rtt < peer.lowestRoundTripTime)
+            peer.lowestRoundTripTime = peer.rtt;
+
+        if (peer.rttVariance > peer.highestRoundTripTimeVariance)
+            peer.highestRoundTripTimeVariance = peer.rttVariance;
+
+        if (peer.packetThrottleEpoch == 0 ||
+            Math.Abs(this.serviceTime - peer.packetThrottleEpoch) >= peer.packetThrottleInterval)
+        {
+            peer.lastRoundTripTime = peer.lowestRoundTripTime;
+            peer.lastRTTVariance = Math.Max(peer.highestRoundTripTimeVariance, 1);
+            peer.lowestRoundTripTime = peer.rtt;
+            peer.highestRoundTripTimeVariance = peer.rttVariance;
+            peer.packetThrottleEpoch = this.serviceTime;
+        }
+
+        peer.lastReceiveTime = Math.Max(this.serviceTime, 1);
+        peer.earliestTimeout = 0;
+
+        receivedReliableSequenceNumber = CSENetUtils.NetToHostOrder(ackCmd.receivedReliableSeqNum);
+
+        commandNumber = ProtoRemoveSentReliableCommand(peer, receivedReliableSequenceNumber, commandHeader.channelID);
+
+        switch (peer.state)
+        {
+            case CSENetPeerState.AckConnect:
+                if (commandNumber != CSENetProtoCmdType.VerifyConnect)
+                    return -1;
+
+                ProtoNotifyConnect(peer, @event);
+                break;
+
+            case CSENetPeerState.Disconnecting:
+                if (commandNumber != CSENetProtoCmdType.Disconnect)
+                    return -1;
+
+                ProtoNotifyDisconnect(peer, @event);
+                break;
+
+            case CSENetPeerState.DisconnectLater:
+                if (peer.outCmds.Count == 0 &&
+                    peer.sentReliableCmds.Count == 0)
+                    peer.Disconnect(peer.@eventData);
+                break;
+
+            default:
+                break;
+        }
+
         return 0;
     }
 
