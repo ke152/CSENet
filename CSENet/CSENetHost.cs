@@ -1042,9 +1042,64 @@ public class CSENetHost
         return 0;
     }
 
+    public CSENetPeer? ProtoHandleConnect(CSENetProtoCmdHeader commandHeader, int commandStartIdx, int commandSize)
+    {
+        uint incomingSessionID, outgoingSessionID;
+        uint mtu, windowSize;
+        uint channelCount, duplicatePeers = 0;
+        CSENetPeer? peer = null;
+
+        if (this.receivedData == null) return null;
+        CSENetProtoConnect? connectCmd = CSENetUtils.DeSerialize<CSENetProtoConnect>(CSENetUtils.SubBytes(this.receivedData, commandStartIdx, commandSize));
+        if (connectCmd == null) return null;
+
+        channelCount = CSENetUtils.NetToHostOrder(connectCmd.channelCount);
+
+        if (channelCount < (int)CSENetDef.ProtoMinChannelCount ||
+            channelCount > (int)CSENetDef.ProtoMaxChannelCount)
+            return null;
+
+        if (this.peers == null)
+        {
+            return null;
+        }
+
+        foreach (var currentPeer in this.peers)
+        {
+            if (currentPeer.state == (int)CSENetPeerState.Disconnected)
+            {
+                if (peer == null)
+                    peer = currentPeer;
+            }
+            else
+            if (currentPeer.state != CSENetPeerState.Connecting &&
+                currentPeer.address?.Address.GetAddressBytes() == this.receivedAddress?.Address.GetAddressBytes())
+            {
+                if (currentPeer?.address?.Port == this.receivedAddress?.Port &&
+                    currentPeer?.connectID == connectCmd.connectID)
+                    return null;
+
+                ++duplicatePeers;
+            }
+        }
+
+        if (peer == null || duplicatePeers >= this.duplicatePeers)
+            return null;
+
+        if (channelCount > this.channelLimit)
+            channelCount = this.channelLimit;
+
+        peer.channels = new CSENetChannel[channelCount];
+        for (int i = 0; i < channelCount; i++)
+        {
+            peer.channels[i] = new CSENetChannel();
+        }
 
 
-    public void ProtoSendOutCmds(int? a, int b)//TODO:delete
+        return peer;
+    }
+
+        public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
 
     }
