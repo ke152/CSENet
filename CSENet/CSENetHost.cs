@@ -1187,7 +1187,67 @@ public class CSENetHost
         return peer;
     }
 
-        public void ProtoSendOutCmds(int? a, int b)//TODO:delete
+    public int ProtoHandleVerifyConnect(CSENetEvent? @event, CSENetPeer peer, int commandStartIdx, int commandSize)
+    {
+        if (this.receivedData == null) return -1;
+        CSENetProtoVerifyConnect? verifyConnectCmd = CSENetUtils.DeSerialize<CSENetProtoVerifyConnect>(CSENetUtils.SubBytes(this.receivedData, commandStartIdx, commandSize));
+        if (verifyConnectCmd == null) return -1;
+
+        uint mtu, windowSize;
+        uint channelCount;
+
+        if (peer.state != CSENetPeerState.Connecting)
+            return 0;
+
+        channelCount = CSENetUtils.NetToHostOrder(verifyConnectCmd.channelCount);
+
+        if (channelCount < (int)CSENetDef.ProtoMinChannelCount || channelCount > (int)CSENetDef.ProtoMaxChannelCount ||
+            CSENetUtils.NetToHostOrder(verifyConnectCmd.packetThrottleInterval) != peer.packetThrottleInterval ||
+         CSENetUtils.NetToHostOrder(verifyConnectCmd.packetThrottleAcceleration) != peer.packetThrottleAcceleration ||
+         CSENetUtils.NetToHostOrder(verifyConnectCmd.packetThrottleDeceleration) != peer.packetThrottleDeceleration ||
+         verifyConnectCmd.connectID != peer.connectID)
+        {
+            peer.@eventData = 0;
+            ProtoDispatchState(peer, CSENetPeerState.Zombie);
+            return -1;
+        }
+
+        ProtoRemoveSentReliableCommand(peer, 1, 0xFF);
+
+        peer.outPeerID = CSENetUtils.NetToHostOrder(verifyConnectCmd.outPeerID);
+        peer.inSessionID = verifyConnectCmd.inSessionID;
+        peer.outSessionID = verifyConnectCmd.outSessionID;
+
+        mtu = CSENetUtils.NetToHostOrder(verifyConnectCmd.mtu);
+
+        if (mtu < (int)CSENetDef.ProtoMinMTU)
+            mtu = (int)CSENetDef.ProtoMinMTU;
+        else
+        if (mtu > (int)CSENetDef.ProtoMaxMTU)
+            mtu = (int)CSENetDef.ProtoMaxMTU;
+
+        if (mtu < peer.mtu)
+            peer.mtu = mtu;
+
+        windowSize = CSENetUtils.NetToHostOrder(verifyConnectCmd.windowSize);
+
+        if (windowSize < (int)CSENetDef.ProtoMinWindowSize)
+            windowSize = (int)CSENetDef.ProtoMinWindowSize;
+
+        if (windowSize > (int)CSENetDef.ProtoMaxWindowSize)
+            windowSize = (int)CSENetDef.ProtoMaxWindowSize;
+
+        if (windowSize < peer.windowSize)
+            peer.windowSize = windowSize;
+
+        peer.inBandwidth = CSENetUtils.NetToHostOrder(verifyConnectCmd.inBandwidth);
+        peer.outBandwidth = CSENetUtils.NetToHostOrder(verifyConnectCmd.outBandwidth);
+
+        ProtoNotifyConnect(peer, @event);
+        return 0;
+    }
+
+    public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
 
     }
