@@ -1095,6 +1095,94 @@ public class CSENetHost
             peer.channels[i] = new CSENetChannel();
         }
 
+        peer.state = CSENetPeerState.AckConnect;
+        peer.connectID = connectCmd.connectID;
+        peer.address = this.receivedAddress;
+        peer.outPeerID = CSENetUtils.NetToHostOrder(connectCmd.outPeerID);
+        peer.inBandwidth = CSENetUtils.NetToHostOrder(connectCmd.inBandwidth);
+        peer.outBandwidth = CSENetUtils.NetToHostOrder(connectCmd.outBandwidth);
+        peer.packetThrottleInterval = CSENetUtils.NetToHostOrder(connectCmd.packetThrottleInterval);
+        peer.packetThrottleAcceleration = CSENetUtils.NetToHostOrder(connectCmd.packetThrottleAcceleration);
+        peer.packetThrottleDeceleration = CSENetUtils.NetToHostOrder(connectCmd.packetThrottleDeceleration);
+        peer.@eventData = CSENetUtils.NetToHostOrder(connectCmd.data);
+
+        incomingSessionID = connectCmd.inSessionID == 0xFF ? peer.outSessionID : connectCmd.inSessionID;
+        incomingSessionID = (incomingSessionID + 1) & ((int)CSENetProtoFlag.HeaderSessionMask >> (int)CSENetProtoFlag.HeaderSessionShift);
+        if (incomingSessionID == peer.outSessionID)
+            incomingSessionID = (incomingSessionID + 1) & ((int)CSENetProtoFlag.HeaderSessionMask >> (int)CSENetProtoFlag.HeaderSessionShift);
+        peer.outSessionID = incomingSessionID;
+
+        outgoingSessionID = connectCmd.outSessionID == 0xFF ? peer.inSessionID : connectCmd.outSessionID;
+        outgoingSessionID = (outgoingSessionID + 1) & ((int)CSENetProtoFlag.HeaderSessionMask >> (int)CSENetProtoFlag.HeaderSessionShift);
+        if (outgoingSessionID == peer.inSessionID)
+            outgoingSessionID = (outgoingSessionID + 1) & ((int)CSENetProtoFlag.HeaderSessionMask >> (int)CSENetProtoFlag.HeaderSessionShift);
+        peer.inSessionID = outgoingSessionID;
+
+        mtu = CSENetUtils.NetToHostOrder(connectCmd.mtu);
+
+        if (mtu < (int)CSENetDef.ProtoMinMTU)
+            mtu = (int)CSENetDef.ProtoMinMTU;
+        else
+        if (mtu > (int)CSENetDef.ProtoMaxMTU)
+            mtu = (int)CSENetDef.ProtoMaxMTU;
+
+        peer.mtu = mtu;
+
+        if (this.outBandwidth == 0 &&
+            peer.inBandwidth == 0)
+            peer.windowSize = (int)CSENetDef.ProtoMaxWindowSize;
+        else
+        if (this.outBandwidth == 0 ||
+            peer.inBandwidth == 0)
+            peer.windowSize = (Math.Max(this.outBandwidth, peer.inBandwidth) /
+                                          (uint)CSENetDef.PeerWindowSizeScale) *
+                                            (int)CSENetDef.ProtoMinWindowSize;
+        else
+            peer.windowSize = (Math.Min(this.outBandwidth, peer.inBandwidth) /
+                                          (uint)CSENetDef.PeerWindowSizeScale) *
+                                            (int)CSENetDef.ProtoMinWindowSize;
+
+        if (peer.windowSize < (int)CSENetDef.ProtoMinWindowSize)
+            peer.windowSize = (int)CSENetDef.ProtoMinWindowSize;
+        else
+        if (peer.windowSize > (int)CSENetDef.ProtoMaxWindowSize)
+            peer.windowSize = (int)CSENetDef.ProtoMaxWindowSize;
+
+
+        if (this.inBandwidth == 0)
+            windowSize = (int)CSENetDef.ProtoMaxWindowSize;
+        else
+            windowSize = (this.inBandwidth / (uint)CSENetDef.PeerWindowSizeScale) *
+                           (int)CSENetDef.ProtoMinWindowSize;
+
+        if (windowSize > CSENetUtils.NetToHostOrder(connectCmd.windowSize))
+            windowSize = CSENetUtils.NetToHostOrder(connectCmd.windowSize);
+
+        if (windowSize < (int)CSENetDef.ProtoMinWindowSize)
+            windowSize = (int)CSENetDef.ProtoMinWindowSize;
+        else
+        if (windowSize > (int)CSENetDef.ProtoMaxWindowSize)
+            windowSize = (int)CSENetDef.ProtoMaxWindowSize;
+
+
+        CSENetProto verifyCommand = new();
+        verifyCommand.header.cmdFlag = (int)CSENetProtoCmdType.VerifyConnect | (int)CSENetProtoFlag.CmdFlagAck;
+        verifyCommand.header.channelID = 0xFF;
+        verifyCommand.verifyConnect = new();
+        verifyCommand.verifyConnect.outPeerID = (uint)IPAddress.HostToNetworkOrder(peer.inPeerID);
+        verifyCommand.verifyConnect.inSessionID = incomingSessionID;
+        verifyCommand.verifyConnect.outSessionID = outgoingSessionID;
+        verifyCommand.verifyConnect.mtu = (uint)IPAddress.HostToNetworkOrder(peer.mtu);
+        verifyCommand.verifyConnect.windowSize = (uint)IPAddress.HostToNetworkOrder(windowSize);
+        verifyCommand.verifyConnect.channelCount = (uint)IPAddress.HostToNetworkOrder(channelCount);
+        verifyCommand.verifyConnect.inBandwidth = (uint)IPAddress.HostToNetworkOrder(this.inBandwidth);
+        verifyCommand.verifyConnect.outBandwidth = (uint)IPAddress.HostToNetworkOrder(this.outBandwidth);
+        verifyCommand.verifyConnect.packetThrottleInterval = (uint)IPAddress.HostToNetworkOrder(peer.packetThrottleInterval);
+        verifyCommand.verifyConnect.packetThrottleAcceleration = (uint)IPAddress.HostToNetworkOrder(peer.packetThrottleAcceleration);
+        verifyCommand.verifyConnect.packetThrottleDeceleration = (uint)IPAddress.HostToNetworkOrder(peer.packetThrottleDeceleration);
+        verifyCommand.verifyConnect.connectID = peer.connectID;
+
+        peer.QueueOutgoingCommand(verifyCommand, null, 0, 0);
 
         return peer;
     }
