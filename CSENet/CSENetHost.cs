@@ -1247,6 +1247,48 @@ public class CSENetHost
         return 0;
     }
 
+    public int ProtoHandleDisconnect(CSENetProtoCmdHeader commandHeader, CSENetPeer peer, int commandStartIdx, int commandSize)
+    {
+        if (peer.state == (int)CSENetPeerState.Disconnected || peer.state == CSENetPeerState.Zombie || peer.state == CSENetPeerState.AckDisconnect)
+            return 0;
+
+        if (this.receivedData == null) return -1;
+        CSENetProtoDisconnect? disconnectCmd = CSENetUtils.DeSerialize<CSENetProtoDisconnect>(CSENetUtils.SubBytes(this.receivedData, commandStartIdx, commandSize));
+        if (disconnectCmd == null) return -1;
+
+        peer.ResetQueues();
+
+        if (peer.state == CSENetPeerState.ConnectionSucceed || peer.state == CSENetPeerState.Disconnecting || peer.state == CSENetPeerState.Connecting)
+            ProtoDispatchState(peer, CSENetPeerState.Zombie);
+        else
+        if (peer.state != CSENetPeerState.Connected && peer.state != CSENetPeerState.DisconnectLater)
+        {
+            if (peer.state == CSENetPeerState.ConnectionPending) this.recalculateBandwidthLimits = 1;
+
+            peer.Reset();
+        }
+        else
+        if ((commandHeader.cmdFlag & (int)CSENetProtoFlag.CmdFlagAck) != 0)
+            ProtoChangeState(peer, CSENetPeerState.AckDisconnect);
+        else
+            ProtoDispatchState(peer, CSENetPeerState.Zombie);
+
+        if (peer.state != (int)CSENetPeerState.Disconnected)
+        {
+            peer.@eventData = CSENetUtils.NetToHostOrder(disconnectCmd.data);
+        }
+
+        return 0;
+    }
+
+    public int ProtoHandlePing(CSENetPeer peer)
+    {
+        if (peer.state != CSENetPeerState.Connected && peer.state != CSENetPeerState.DisconnectLater)
+            return -1;
+
+        return 0;
+    }
+
     public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
 
