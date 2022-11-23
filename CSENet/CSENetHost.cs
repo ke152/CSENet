@@ -1289,6 +1289,32 @@ public class CSENetHost
         return 0;
     }
 
+    public int ProtoHandleSendUnreliable(CSENetProtoCmdHeader commandHeader, CSENetPeer peer, int commandStartIdx, int commandSize, ref int currentDataIdx)
+    {
+        uint dataLength;
+
+        if (commandHeader.channelID >= peer.ChannelCount ||
+            (peer.state != CSENetPeerState.Connected && peer.state != CSENetPeerState.DisconnectLater))
+            return -1;
+
+        if (this.receivedData == null) return -1;
+        CSENetProtoSendUnReliable? sendUnReliableCmd = CSENetUtils.DeSerialize<CSENetProtoSendUnReliable>(CSENetUtils.SubBytes(this.receivedData, commandStartIdx, commandSize));
+        if (sendUnReliableCmd == null) return -1;
+
+        dataLength = CSENetUtils.NetToHostOrder(sendUnReliableCmd.dataLength);
+        byte[] packetData = CSENetUtils.SubBytes(this.receivedData, currentDataIdx, (int)dataLength);
+        currentDataIdx += (int)dataLength;
+
+        if (dataLength > this.maximumPacketSize ||
+            currentDataIdx > this.receivedDataLength)
+            return -1;
+
+        if (peer.QueueInCmd(commandHeader, packetData, dataLength, 0, 0, sendUnReliableCmd.unreliableSeqNum) == null)
+            return -1;
+
+        return 0;
+    }
+
     public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
 
