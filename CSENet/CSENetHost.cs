@@ -1343,6 +1343,43 @@ public class CSENetHost
         return 0;
     }
 
+    public int ProtoHandleBandwidthLimit(CSENetProtoCmdHeader commandHeader, CSENetPeer peer, int commandStartIdx, int commandSize)
+    {
+        if (peer.state != CSENetPeerState.Connected && peer.state != CSENetPeerState.DisconnectLater)
+            return -1;
+
+        if (peer.inBandwidth != 0)
+            --this.bandwidthLimitedPeers;
+
+        if (this.receivedData == null) return -1;
+        CSENetProtoBandwidthLimit? bandwidthLimitCmd = CSENetUtils.DeSerialize<CSENetProtoBandwidthLimit>(CSENetUtils.SubBytes(this.receivedData, commandStartIdx, commandSize));
+        if (bandwidthLimitCmd == null) return -1;
+
+        peer.inBandwidth = CSENetUtils.NetToHostOrder(bandwidthLimitCmd.inBandwidth);
+        peer.outBandwidth = CSENetUtils.NetToHostOrder(bandwidthLimitCmd.outBandwidth);
+
+        if (peer.inBandwidth != 0)
+            ++this.bandwidthLimitedPeers;
+
+        if (peer.inBandwidth == 0 && this.outBandwidth == 0)
+            peer.windowSize = (int)CSENetDef.ProtoMaxWindowSize;
+        else
+        if (peer.inBandwidth == 0 || this.outBandwidth == 0)
+            peer.windowSize = (Math.Max(peer.inBandwidth, this.outBandwidth) /
+                                   (uint)CSENetDef.PeerWindowSizeScale) * (int)CSENetDef.ProtoMinWindowSize;
+        else
+            peer.windowSize = (Math.Min(peer.inBandwidth, this.outBandwidth) /
+                                   (uint)CSENetDef.PeerWindowSizeScale) * (int)CSENetDef.ProtoMinWindowSize;
+
+        if (peer.windowSize < (int)CSENetDef.ProtoMinWindowSize)
+            peer.windowSize = (int)CSENetDef.ProtoMinWindowSize;
+        else
+        if (peer.windowSize > (int)CSENetDef.ProtoMaxWindowSize)
+            peer.windowSize = (int)CSENetDef.ProtoMaxWindowSize;
+
+        return 0;
+    }
+
     public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
 
