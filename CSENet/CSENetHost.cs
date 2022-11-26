@@ -1380,7 +1380,47 @@ public class CSENetHost
         return 0;
     }
 
-    public void ProtoSendOutCmds(int? a, int b)//TODO:delete
+    public int ProtoHandleSendFragment(CSENetProtoCmdHeader commandHeader, CSENetPeer peer, int commandStartIdx, int commandSize, ref int currentDataIdx)
+    {
+        uint fragmentNumber,
+               fragmentCount,
+               fragmentOffset,
+               fragmentLength,
+               startSequenceNumber,
+               totalLength;
+        CSENetChannel channel;
+        uint startWindow, currentWindow;
+
+        if (commandHeader.channelID >= peer.ChannelCount ||
+            (peer.state != CSENetPeerState.Connected && peer.state != CSENetPeerState.DisconnectLater))
+            return -1;
+
+        if (this.receivedData == null) return -1;
+        CSENetProtoSendFragment? sendFragmentCmd = CSENetUtils.DeSerialize<CSENetProtoSendFragment>(CSENetUtils.SubBytes(this.receivedData, commandStartIdx, commandSize));
+        if (sendFragmentCmd == null) return -1;
+
+        fragmentLength = CSENetUtils.NetToHostOrder(sendFragmentCmd.dataLength);
+        currentDataIdx += (int)fragmentLength;
+        if (fragmentLength > this.maximumPacketSize ||
+            currentDataIdx > this.receivedDataLength)
+            return -1;
+
+        if (peer.channels == null) return -1;
+        channel = peer.channels[commandHeader.channelID];
+        startSequenceNumber = CSENetUtils.NetToHostOrder(sendFragmentCmd.startSeqNum);
+        startWindow = startSequenceNumber / (uint)CSENetDef.PeerReliableWindowSize;
+        currentWindow = channel.inReliableSeqNum / (uint)CSENetDef.PeerReliableWindowSize;
+
+        if (startSequenceNumber < channel.inReliableSeqNum)
+            startWindow += (uint)CSENetDef.PeerReliableWindows;
+
+        if (startWindow < currentWindow || startWindow >= currentWindow + (uint)CSENetDef.PeerFreeReliableWindows - 1)
+            return 0;
+
+        return 0;
+    }
+
+        public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
 
     }
