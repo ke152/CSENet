@@ -1417,6 +1417,50 @@ public class CSENetHost
         if (startWindow < currentWindow || startWindow >= currentWindow + (uint)CSENetDef.PeerFreeReliableWindows - 1)
             return 0;
 
+        fragmentNumber = CSENetUtils.NetToHostOrder(sendFragmentCmd.fragmentNum);
+        fragmentCount = CSENetUtils.NetToHostOrder(sendFragmentCmd.fragmentCount);
+        fragmentOffset = CSENetUtils.NetToHostOrder(sendFragmentCmd.fragmentOffset);
+        totalLength = CSENetUtils.NetToHostOrder(sendFragmentCmd.totalLength);
+
+        if (fragmentCount > (int)CSENetDef.ProtoMaxFragmentCount ||
+            fragmentNumber >= fragmentCount ||
+            totalLength > this.maximumPacketSize ||
+            fragmentOffset >= totalLength ||
+            fragmentLength > totalLength - fragmentOffset)
+            return -1;
+
+        CSENetInCmd currentCommand;
+        CSENetInCmd? startCommand = null;
+        for (int i = channel.inReliableCmds.Count - 1; i >= 0; i--)
+        {
+            currentCommand = channel.inReliableCmds[i];
+            CSENetInCmd incomingcommand = currentCommand;
+
+            if (startSequenceNumber >= channel.inReliableSeqNum)
+            {
+                if (incomingcommand.reliableSeqNum < channel.inReliableSeqNum)
+                    continue;
+            }
+            else
+            if (incomingcommand.reliableSeqNum >= channel.inReliableSeqNum)
+                break;
+
+            if (incomingcommand.reliableSeqNum <= startSequenceNumber)
+            {
+                if (incomingcommand.reliableSeqNum < startSequenceNumber)
+                    break;
+
+                if ((incomingcommand.cmdHeader.cmdFlag & (int)CSENetProtoCmdType.Mask) != (int)CSENetProtoCmdType.SendFragment ||
+                    (incomingcommand.packet != null && totalLength != incomingcommand.packet.DataLength) ||
+                     fragmentCount != incomingcommand.fragmentCount)
+                    return -1;
+
+                startCommand = incomingcommand;
+                break;
+            }
+        }
+
+
         return 0;
     }
 
