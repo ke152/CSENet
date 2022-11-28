@@ -1460,11 +1460,38 @@ public class CSENetHost
             }
         }
 
+        if (startCommand == null)
+        {
+            commandHeader.reliableSeqNum = startSequenceNumber;
+
+            startCommand = peer.QueueInCmd(commandHeader, null, totalLength, (int)CSENetPacketFlag.Reliable, fragmentCount);
+            if (startCommand == null)
+                return -1;
+        }
+
+        if (startCommand.fragments != null && (startCommand.fragments[fragmentNumber / 32] & (uint)(1 << ((int)fragmentNumber % 32))) == 0)
+        {
+            --startCommand.fragmentsRemaining;
+
+            startCommand.fragments[fragmentNumber / 32] |= (uint)(1 << ((int)fragmentNumber % 32));
+
+            if (startCommand.packet != null && fragmentOffset + fragmentLength > startCommand.packet.DataLength)
+                fragmentLength = startCommand.packet.DataLength - fragmentOffset;
+
+            if (startCommand.packet != null && startCommand.packet.Data != null)
+            {
+                Array.Copy(startCommand.packet.Data, fragmentOffset, this.receivedData, currentDataIdx, fragmentLength);
+            }
+
+            if (startCommand.fragmentsRemaining <= 0)
+                peer.DispatchInReliableCmds(channel, null);
+        }
 
         return 0;
     }
 
-        public void ProtoSendOutCmds(int? a, int b)//TODO:delete
+
+    public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
 
     }
