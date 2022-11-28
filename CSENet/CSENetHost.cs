@@ -1490,6 +1490,21 @@ public class CSENetHost
         return 0;
     }
 
+    public int ProtoHandleThrottleConfigure(CSENetProtoCmdHeader commandHeader, CSENetPeer peer, int commandStartIdx, int commandSize)
+    {
+        if (peer.state != CSENetPeerState.Connected && peer.state != CSENetPeerState.DisconnectLater)
+            return -1;
+
+        if (this.receivedData == null) return -1;
+        CSENetProtoThrottleConfigure? throttleConfigCmd = CSENetUtils.DeSerialize<CSENetProtoThrottleConfigure>(CSENetUtils.SubBytes(this.receivedData, commandStartIdx, commandSize));
+        if (throttleConfigCmd == null) return -1;
+
+        peer.packetThrottleInterval = CSENetUtils.NetToHostOrder(throttleConfigCmd.packetThrottleInterval);
+        peer.packetThrottleAcceleration = CSENetUtils.NetToHostOrder(throttleConfigCmd.packetThrottleAcceleration);
+        peer.packetThrottleDeceleration = CSENetUtils.NetToHostOrder(throttleConfigCmd.packetThrottleDeceleration);
+
+        return 0;
+    }
 
     public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
