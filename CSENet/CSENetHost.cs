@@ -1506,6 +1506,57 @@ public class CSENetHost
         return 0;
     }
 
+    public int ProtoHandleSendUnsequenced(CSENetProtoCmdHeader commandHeader, CSENetPeer peer, int commandStartIdx, int commandSize, ref int currentDataIdx)
+    {
+        uint unsequencedGroup, index;
+        uint dataLength;
+
+        if (commandHeader.channelID >= peer.ChannelCount ||
+            (peer.state != CSENetPeerState.Connected && peer.state != CSENetPeerState.DisconnectLater))
+            return -1;
+
+        if (this.receivedData == null) return -1;
+        CSENetProtoSendUnsequenced? sendUnseq = CSENetUtils.DeSerialize<CSENetProtoSendUnsequenced>(CSENetUtils.SubBytes(this.receivedData, commandStartIdx, commandSize));
+        if (sendUnseq == null) return -1;
+
+        dataLength = CSENetUtils.NetToHostOrder(sendUnseq.dataLength);
+        currentDataIdx += (int)dataLength;
+        if (dataLength > this.maximumPacketSize ||
+             currentDataIdx > this.receivedDataLength)
+            return -1;
+
+        unsequencedGroup = CSENetUtils.NetToHostOrder(sendUnseq.unseqGroup);
+        index = unsequencedGroup % (uint)CSENetDef.PeerUnseqWindowSize;
+
+        if (unsequencedGroup < peer.inUnseqGroup)
+            unsequencedGroup += 0x10000;
+
+        if (unsequencedGroup >= (uint)peer.inUnseqGroup + (uint)CSENetDef.PeerUnseqWindows * (uint)CSENetDef.PeerUnseqWindowSize)
+            return 0;
+
+        unsequencedGroup &= 0xFFFF;
+
+        if (unsequencedGroup - index != peer.inUnseqGroup)
+        {
+            peer.inUnseqGroup = unsequencedGroup - index;
+            Array.Clear(peer.unseqWindow);
+        }
+        else
+        if ((peer.unseqWindow[index / 32] & (uint)(1 << (int)(index % 32))) != 0)
+            return 0;
+
+
+        byte[] packetData = CSENetUtils.SubBytes(this.receivedData, currentDataIdx, (int)dataLength);
+        currentDataIdx += (int)dataLength;
+
+        if (peer.QueueInCmd(commandHeader, packetData, dataLength, (int)CSENetPacketFlag.UnSeq, 0) == null)
+            return -1;
+
+        peer.unseqWindow[index / 32] |= (uint)(1 << ((int)index % 32));
+
+        return 0;
+    }
+
     public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
 
