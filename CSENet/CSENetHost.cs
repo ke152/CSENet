@@ -1557,7 +1557,71 @@ public class CSENetHost
         return 0;
     }
 
-    public void ProtoSendOutCmds(int? a, int b)//TODO:delete
+    public int ProtoHandleSendUnreliableFragment(CSENetProtoCmdHeader commandHeader, CSENetPeer peer, int commandStartIdx, int commandSize, ref int currentDataIdx)
+    {
+        uint fragmentNumber,
+               fragmentCount,
+               fragmentOffset,
+               fragmentLength,
+               reliableSequenceNumber,
+               startSequenceNumber,
+               totalLength;
+        uint reliableWindow, currentWindow;
+        CSENetChannel channel;
+
+        if (commandHeader.channelID >= peer.ChannelCount ||
+            (peer.state != CSENetPeerState.Connected && peer.state != CSENetPeerState.DisconnectLater))
+            return -1;
+
+        if (this.receivedData == null) return -1;
+        CSENetProtoSendFragment? sendFragmentCmd = CSENetUtils.DeSerialize<CSENetProtoSendFragment>(CSENetUtils.SubBytes(this.receivedData, commandStartIdx, commandSize));
+        if (sendFragmentCmd == null) return -1;
+
+        fragmentLength = CSENetUtils.NetToHostOrder(sendFragmentCmd.dataLength);
+        currentDataIdx += (int)fragmentLength;
+        if (fragmentLength > this.maximumPacketSize ||
+            currentDataIdx > this.receivedDataLength)
+            return -1;
+
+        if (peer.channels == null) return -1;
+        channel = peer.channels[commandHeader.channelID];
+
+        reliableSequenceNumber = commandHeader.reliableSeqNum;
+        startSequenceNumber = CSENetUtils.NetToHostOrder(sendFragmentCmd.startSeqNum);
+
+        reliableWindow = reliableSequenceNumber / (uint)CSENetDef.PeerReliableWindowSize;
+        currentWindow = channel.inReliableSeqNum / (uint)CSENetDef.PeerReliableWindowSize;
+
+        if (reliableSequenceNumber < channel.inReliableSeqNum)
+            reliableWindow += (uint)CSENetDef.PeerReliableWindows;
+
+        if (reliableWindow < currentWindow || reliableWindow >= currentWindow + (uint)CSENetDef.PeerFreeReliableWindows - 1)
+            return 0;
+
+        if (reliableSequenceNumber == channel.inReliableSeqNum &&
+            startSequenceNumber <= channel.inUnreliableSeqNum)
+            return 0;
+
+        fragmentNumber = CSENetUtils.NetToHostOrder(sendFragmentCmd.fragmentNum);
+        fragmentCount = CSENetUtils.NetToHostOrder(sendFragmentCmd.fragmentCount);
+        fragmentOffset = CSENetUtils.NetToHostOrder(sendFragmentCmd.fragmentOffset);
+        totalLength = CSENetUtils.NetToHostOrder(sendFragmentCmd.totalLength);
+
+        if (fragmentCount > (int)CSENetDef.ProtoMaxFragmentCount ||
+            fragmentNumber >= fragmentCount ||
+            totalLength > this.maximumPacketSize ||
+            fragmentOffset >= totalLength ||
+            fragmentLength > totalLength - fragmentOffset)
+            return -1;
+
+        CSENetInCmd currentCommand;
+        CSENetInCmd? startCommand = null;
+
+        return 0;
+
+    }
+
+        public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
 
     }
