@@ -1617,17 +1617,78 @@ public class CSENetHost
         CSENetInCmd currentCommand;
         CSENetInCmd? startCommand = null;
 
+        for (int i = channel.inUnreliableCmds.Count - 1; i >= 0; i--)
+        {
+            currentCommand = channel.inUnreliableCmds[i];
+            CSENetInCmd inCmd = currentCommand;
+
+            if (reliableSequenceNumber >= channel.inReliableSeqNum)
+            {
+                if (inCmd.reliableSeqNum < channel.inReliableSeqNum)
+                    continue;
+            }
+            else
+            if (inCmd.reliableSeqNum >= channel.inReliableSeqNum)
+                break;
+
+            if (inCmd.reliableSeqNum < reliableSequenceNumber)
+                break;
+
+            if (inCmd.reliableSeqNum > reliableSequenceNumber)
+                continue;
+
+            if (inCmd.unreliableSeqNum <= startSequenceNumber)
+            {
+                if (inCmd.unreliableSeqNum < startSequenceNumber)
+                    break;
+
+                if ((inCmd.cmdHeader.cmdFlag & (int)CSENetProtoCmdType.Mask) != (int)CSENetProtoCmdType.SendUnreliableFragment ||
+                    (inCmd.packet != null && totalLength != inCmd.packet.DataLength) ||
+                     fragmentCount != inCmd.fragmentCount)
+                    return -1;
+
+                startCommand = inCmd;
+                break;
+            }
+        }
+
+        if (startCommand == null)
+        {
+            startCommand = peer.QueueInCmd(commandHeader, null, totalLength, (int)CSENetPacketFlag.UnreliableFragment, fragmentCount, sendFragmentCmd.startSeqNum);
+            if (startCommand == null)
+                return -1;
+        }
+
+        if (startCommand.fragments != null && (startCommand.fragments[fragmentNumber / 32] & (1 << ((int)fragmentNumber % 32))) == 0)
+        {
+            --startCommand.fragmentsRemaining;
+
+            startCommand.fragments[fragmentNumber / 32] |= (uint)(1 << ((int)fragmentNumber % 32));
+
+            if (startCommand.packet != null && fragmentOffset + fragmentLength > startCommand.packet.DataLength)
+                fragmentLength = startCommand.packet.DataLength - fragmentOffset;
+
+            if (startCommand.packet != null && startCommand.packet.Data != null)
+            {
+                Array.Copy(startCommand.packet.Data, fragmentOffset, this.receivedData, currentDataIdx, fragmentLength);
+            }
+
+            if (startCommand.fragmentsRemaining <= 0)
+                peer.DispatchInUnreliableCmds(channel, null);
+        }
+
         return 0;
 
     }
 
-        public void ProtoSendOutCmds(int? a, int b)//TODO:delete
+    #endregion
+
+    public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
 
     }
 
 
-    #endregion
 
 
 
