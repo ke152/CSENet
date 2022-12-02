@@ -734,6 +734,72 @@ public class CSENetHost
         return 0;
     }
 
+    public void ProtoSendAcknowledgements(CSENetPeer peer)
+    {
+        if (peer.acknowledgements.Count == 0)
+        {
+            return;
+        }
+
+        CSENetAckCmd acknowledgement;
+        CSENetAckCmd currentAcknowledgement;
+        uint reliableSequenceNumber;
+
+        currentAcknowledgement = peer.acknowledgements.First();
+
+        while (peer.acknowledgements.Count > 0)
+        {
+            acknowledgement = peer.acknowledgements.First();
+
+            CSENetProto command = new();
+
+            if (this.CommandCount > CSENetDef.ProtoMaxPacketCmds ||
+                this.BufferCount >= CSENetDef.BufferMax ||
+                peer.mtu - this.packetSize < Marshal.SizeOf<CSENetProtoAck>())
+            {
+                this.continueSending = 1;
+
+                break;
+            }
+
+            reliableSequenceNumber = (uint)IPAddress.HostToNetworkOrder(acknowledgement.cmdHeader.reliableSeqNum);
+
+            command.header.cmdFlag = (int)CSENetProtoCmdType.Ack;
+            command.header.channelID = acknowledgement.cmdHeader.channelID;
+            command.header.reliableSeqNum = reliableSequenceNumber;
+            command.ack = new();
+            command.ack.receivedReliableSeqNum = reliableSequenceNumber;
+            command.ack.receivedSentTime = (uint)IPAddress.HostToNetworkOrder(acknowledgement.sentTime);
+
+            if ((acknowledgement.cmdHeader.cmdFlag & (int)CSENetProtoCmdType.Mask) == (int)CSENetProtoCmdType.Disconnect)
+                ProtoDispatchState(peer, CSENetPeerState.Zombie);
+
+            peer.acknowledgements.RemoveAt(0);
+
+            byte[]? buffer = CSENetUtils.Serialize<CSENetProtoAck>(command.ack);
+            if (buffer == null)
+            {
+                continue;
+            }
+
+            this.packetSize += (uint)buffer.Length;
+
+            this.commands.Add(command);
+            this.buffers.Add(buffer);
+        }
+
+    }
+    public void ProtoSendOutCmds(int? a, int b)//TODO:delete
+    {
+
+    }
+
+
+
+
+
+    #endregion
+
     #region Proto Handle
 
     public int ProtoHandleIncomingCommands(CSENetEvent? @event)//TODO:delete
@@ -1683,14 +1749,4 @@ public class CSENetHost
 
     #endregion
 
-    public void ProtoSendOutCmds(int? a, int b)//TODO:delete
-    {
-
-    }
-
-
-
-
-
-    #endregion
 }
