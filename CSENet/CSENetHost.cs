@@ -789,6 +789,60 @@ public class CSENetHost
         }
 
     }
+
+    public int ProtoCheckTimeouts(ENetPeer peer, ENetEvent? @event)
+    {
+        ENetOutCmd outgoingCommand;
+        ENetOutCmd currentCommand;
+
+        int i = 0;
+        while (i < peer.sentReliableCmds.Count)
+        {
+            currentCommand = peer.sentReliableCmds[i];
+            outgoingCommand = currentCommand;
+
+            i++;
+
+            if (Math.Abs(this.serviceTime - outgoingCommand.sentTime) < outgoingCommand.rttTimeout)
+                continue;
+
+            if (peer.earliestTimeout == 0 ||
+                outgoingCommand.sentTime < peer.earliestTimeout)
+                peer.earliestTimeout = outgoingCommand.sentTime;
+
+            if (peer.earliestTimeout != 0 &&
+                  (Math.Abs(this.serviceTime - peer.earliestTimeout) >= peer.timeoutMaximum ||
+                    (outgoingCommand.rttTimeout >= outgoingCommand.rttTimeoutLimit &&
+                      Math.Abs(this.serviceTime - peer.earliestTimeout) >= peer.timeoutMinimum)))
+            {
+                ProtoNotifyDisconnect(peer, @event);
+
+                return 1;
+            }
+
+            if (outgoingCommand.packet != null)
+                peer.reliableDataInTransit -= outgoingCommand.fragmentLength;
+
+            ++peer.packetsLost;
+
+            outgoingCommand.rttTimeout *= 2;
+
+            peer.outCmds.Insert(0, outgoingCommand);
+            peer.sentReliableCmds.Remove(outgoingCommand);
+
+
+            if (currentCommand != null && peer.sentReliableCmds.Count != 0 && currentCommand == peer.sentReliableCmds.First()
+               )
+            {
+                outgoingCommand = currentCommand;
+
+                peer.nextTimeout = outgoingCommand.sentTime + outgoingCommand.rttTimeout;
+            }
+        }
+
+        return 0;
+    }
+
     public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
 
