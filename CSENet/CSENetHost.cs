@@ -790,10 +790,10 @@ public class CSENetHost
 
     }
 
-    public int ProtoCheckTimeouts(ENetPeer peer, ENetEvent? @event)
+    public int ProtoCheckTimeouts(CSENetPeer peer, CSENetEvent? @event)
     {
-        ENetOutCmd outgoingCommand;
-        ENetOutCmd currentCommand;
+        CSENetOutCmd outgoingCommand;
+        CSENetOutCmd currentCommand;
 
         int i = 0;
         while (i < peer.sentReliableCmds.Count)
