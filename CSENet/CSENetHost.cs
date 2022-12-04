@@ -843,6 +843,34 @@ public class CSENetHost
         return 0;
     }
 
+    public int ProtoCheckOutgoingCommands(CSENetPeer peer)
+    {
+        CSENetOutCmd outgoingCommand;
+        CSENetOutCmd currentCommand;
+        CSENetChannel? channel = null;
+        uint reliableWindow = 0;
+        uint commandSize;
+        int windowExceeded = 0, windowWrap = 0, canPing = 1;
+
+        int i = 0;
+        while (i < peer.outCmds.Count)
+        {
+            currentCommand = peer.outCmds[i];
+            outgoingCommand = currentCommand;
+
+            //TODO
+
+        }//while
+
+        if (peer.state == CSENetPeerState.DisconnectLater &&
+            peer.outCmds.Count == 0 &&
+            peer.sentReliableCmds.Count == 0 &&
+            peer.sentUnreliableCmds.Count == 0)
+            peer.Disconnect(peer.@eventData);
+
+        return canPing;
+    }
+
     public void ProtoSendOutCmds(int? a, int b)//TODO:delete
     {
 
