@@ -858,6 +858,50 @@ public class CSENetHost
             currentCommand = peer.outCmds[i];
             outgoingCommand = currentCommand;
 
+            if ((outgoingCommand.cmdHeader.cmdFlag & (int)CSENetProtoFlag.CmdFlagAck) != 0)
+            {
+                channel = outgoingCommand.cmdHeader.channelID < peer.ChannelCount ? peer.channels?[outgoingCommand.cmdHeader.channelID] : null;
+                reliableWindow = outgoingCommand.reliableSeqNum / (uint)CSENetDef.PeerReliableWindowSize;
+                if (channel != null)
+                {
+                    if (windowWrap == 0 &&
+                         outgoingCommand.sendAttempts < 1 &&
+                         (outgoingCommand.reliableSeqNum % (uint)CSENetDef.PeerReliableWindowSize) == 0 &&
+                            (channel.reliableWindows[(reliableWindow + (uint)CSENetDef.PeerReliableWindows - 1) % (uint)CSENetDef.PeerReliableWindows] >= (uint)CSENetDef.PeerReliableWindowSize ||
+                                (channel.usedReliableWindows &
+                                ((((1 << ((int)CSENetDef.PeerFreeReliableWindows + 2)) - 1) << (int)reliableWindow) |
+                                        (((1 << ((int)CSENetDef.PeerFreeReliableWindows + 2)) - 1) >> ((int)CSENetDef.PeerReliableWindows - (int)reliableWindow))
+                                )) != 0
+                             )
+                        )
+                        windowWrap = 1;
+                    if (windowWrap == 0)
+                    {
+                        i++;
+
+                        continue;
+                    }
+                }
+
+                if (outgoingCommand.packet != null)
+                {
+                    if (windowExceeded != 0)
+                    {
+                        uint windowSize = (peer.packetThrottle * peer.windowSize) / (uint)CSENetDef.PeerPacketThrottleScale;
+
+                        if (peer.reliableDataInTransit + outgoingCommand.fragmentLength > Math.Max(windowSize, peer.mtu))
+                            windowExceeded = 1;
+                    }
+                    if (windowExceeded != 0)
+                    {
+                        i++;
+                        continue;
+                    }
+                }
+
+                canPing = 0;
+            }//if
+
             //TODO
 
         }//while
