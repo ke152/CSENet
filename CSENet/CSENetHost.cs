@@ -902,6 +902,49 @@ public class CSENetHost
                 canPing = 0;
             }//if
 
+            commandSize = CSENetProtoCmdSize.CmdSize[outgoingCommand.cmdHeader.cmdFlag & (int)CSENetProtoCmdType.Mask];
+            if (this.CommandCount > CSENetDef.ProtoMaxPacketCmds ||
+                this.BufferCount >= CSENetDef.BufferMax ||
+                peer.mtu - this.packetSize < commandSize ||
+                (outgoingCommand.packet != null &&
+                (uint)(peer.mtu - this.packetSize) < (uint)(commandSize + outgoingCommand.fragmentLength)))
+            {
+                this.continueSending = 1;
+
+                break;
+            }
+
+            i++;
+
+            if ((outgoingCommand.cmdHeader.cmdFlag & (int)CSENetProtoFlag.CmdFlagAck) != 0)
+            {
+                if (channel != null && outgoingCommand.sendAttempts < 1)
+                {
+                    channel.usedReliableWindows |= 1 << (int)reliableWindow;
+                    ++channel.reliableWindows[reliableWindow];
+                }
+
+                ++outgoingCommand.sendAttempts;
+
+                if (outgoingCommand.rttTimeout == 0)
+                {
+                    outgoingCommand.rttTimeout = peer.rtt + 4 * peer.rttVariance;
+                    outgoingCommand.rttTimeoutLimit = peer.timeoutLimit * outgoingCommand.rttTimeout;
+                }
+
+                if (peer.sentReliableCmds.Count == 0)
+                    peer.nextTimeout = this.serviceTime + outgoingCommand.rttTimeout;
+
+                peer.outCmds.Remove(currentCommand);
+                peer.sentReliableCmds.Add(currentCommand);
+
+                outgoingCommand.sentTime = this.serviceTime;
+
+                this.headerFlags |= (int)CSENetProtoFlag.HeaderFalgSentTime;
+
+                peer.reliableDataInTransit += outgoingCommand.fragmentLength;
+            }
+
             //TODO
 
         }//while
