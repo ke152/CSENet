@@ -944,7 +944,42 @@ public class CSENetHost
 
                 peer.reliableDataInTransit += outgoingCommand.fragmentLength;
             }
+            else
+            {
+                if (outgoingCommand.packet != null && outgoingCommand.fragmentOffset == 0)
+                {
+                    peer.packetThrottleCounter += (uint)CSENetDef.PeerPacketThrottleCounter;
+                    peer.packetThrottleCounter %= (uint)CSENetDef.PeerPacketThrottleScale;
 
+                    if (peer.packetThrottleCounter > peer.packetThrottle)
+                    {
+                        uint reliableSequenceNumber = outgoingCommand.reliableSeqNum,
+                                    unreliableSequenceNumber = outgoingCommand.unreliableSeqNum;
+                        for (; ; )
+                        {
+                            if (currentCommand == null)
+                                break;
+
+                            outgoingCommand = currentCommand;
+                            if (outgoingCommand.reliableSeqNum != reliableSequenceNumber ||
+                                outgoingCommand.unreliableSeqNum != unreliableSequenceNumber)
+                                break;
+
+                            i++;
+                        }
+
+                        continue;
+                    }
+                }
+
+                peer.outCmds.Remove(currentCommand);
+
+                if (outgoingCommand.packet != null)
+                    peer.sentUnreliableCmds.Add(currentCommand);
+            }
+
+            CSENetProto command = outgoingCommand.cmd;
+            byte[]? buffer = null;
             //TODO
 
         }//while
