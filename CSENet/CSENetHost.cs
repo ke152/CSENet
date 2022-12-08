@@ -980,7 +980,51 @@ public class CSENetHost
 
             CSENetProto command = outgoingCommand.cmd;
             byte[]? buffer = null;
-            //TODO
+
+            //TODO:这里得替换，似乎有点不对，后面再看看
+            buffer = CSENetUtils.Serialize<CSENetProto>(command);
+            //switch (command.header.cmdFlag & (int)CSENetProtoCmdType.Mask)
+            //{
+            //    case (int)CSENetProtoCmdType.Ack:
+            //        buffer = CSENetUtils.Serialize<CSENetProtoAck>(command.ack);
+            //        break;
+            //    case (int)ENetProtoCmdType.Connect:
+            //        buffer = CSENetUtils.Serialize<CSENetProtoConnect>(command.connect);
+            //        break;
+            //    //VerifyConnect = 3,
+            //    //Disconnect = 4,
+            //    //Ping = 5,
+            //    //SendReliable = 6,
+            //    //SendUnreliable = 7,
+            //    //SendFragment = 8,
+            //    //SendUnseq = 9,
+            //    //BandwidthLimit = 10,
+            //    //ThrottleConfig = 11,
+            //    //SendUnreliableFragment = 12,
+            //    //Count = 13,
+            //    default:
+            //        break;
+            //}
+            if (buffer == null) continue;
+            //buffer->data = command;
+            //buffer->dataLength = commandSize;
+
+            this.packetSize += (uint)buffer.Length;
+
+            this.commands.Add(command);
+            this.buffers.Add(buffer);
+
+            if (outgoingCommand.packet != null && outgoingCommand.packet.Data != null)
+            {
+                byte[] newBuffer = new byte[outgoingCommand.fragmentLength];
+                Array.Copy(newBuffer, 0, outgoingCommand.packet.Data, outgoingCommand.fragmentOffset, newBuffer.Length);
+
+                this.packetSize += outgoingCommand.fragmentLength;
+
+                this.buffers.Add(newBuffer);
+            }
+
+            ++peer.packetsSent;
 
         }//while
 
