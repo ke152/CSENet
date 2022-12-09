@@ -1037,9 +1037,43 @@ public class CSENetHost
         return canPing;
     }
 
-    public void ProtoSendOutCmds(int? a, int b)//TODO:delete
+    public int ProtoSendOutCmds(CSENetEvent? @event, int checkForTimeouts)
     {
+        CSENetPeer currentPeer;
+        int currPeerIdx = 0;
+        int sentLength = 0;
 
+        if (this.peers == null || this.peers.Length == 0)
+            return -1;
+
+        this.continueSending = 1;
+
+        while (this.continueSending != 0)
+        {
+            for (this.continueSending = 0,
+                  currPeerIdx = 0;
+                 currPeerIdx < this.peers.Length;
+                 ++currPeerIdx)
+            {
+                currentPeer = this.peers[currPeerIdx];
+
+                if (currentPeer.state == CSENetPeerState.Disconnected ||
+                    currentPeer.state == CSENetPeerState.Zombie)
+                    continue;
+
+                this.headerFlags = 0;
+                this.commands.Clear();
+                this.buffers.Clear();
+                this.packetSize = (uint)Marshal.SizeOf<CSENetProtoHeader>();
+
+                if (currentPeer.acknowledgements.Count > 0)
+                    ProtoSendAcknowledgements(currentPeer);
+
+                //TODO
+            }
+        }
+
+        return 0;
     }
 
 
