@@ -1069,7 +1069,74 @@ public class CSENetHost
                 if (currentPeer.acknowledgements.Count > 0)
                     ProtoSendAcknowledgements(currentPeer);
 
-                //TODO
+                if (checkForTimeouts != 0 &&
+                    currentPeer.sentReliableCmds.Count > 0 &&
+                    this.serviceTime >= currentPeer.nextTimeout &&
+                    ProtoCheckTimeouts(currentPeer, @event) == 1)
+                {
+                    if (@event != null && @event.type != CSENetEventType.None)
+                        return 1;
+                    else
+                        continue;
+                }
+
+                if ((currentPeer.outCmds.Count == 0 ||
+                      ProtoCheckOutgoingCommands(currentPeer) != 0) &&
+                    currentPeer.sentReliableCmds.Count == 0 &&
+                    Math.Abs(this.serviceTime - currentPeer.lastReceiveTime) >= currentPeer.pingInterval &&
+                    currentPeer.mtu - this.packetSize >= Marshal.SizeOf<CSENetProtoPing>())
+                {
+                    currentPeer.Ping();
+                    ProtoCheckOutgoingCommands(currentPeer);
+                }
+
+                if (this.CommandCount == 0)
+                    continue;
+
+                if (currentPeer.packetLossEpoch == 0)
+                    currentPeer.packetLossEpoch = this.serviceTime;
+                else
+                if (Math.Abs(this.serviceTime - currentPeer.packetLossEpoch) >= (uint)CSENetDef.PeerPacketLossInterval &&
+                    currentPeer.packetsSent > 0)
+                {
+                    uint packetLoss = currentPeer.packetsLost * (uint)CSENetDef.PeerPacketLossScale / currentPeer.packetsSent;
+
+                    currentPeer.packetLossVariance = (currentPeer.packetLossVariance * 3 + Math.Abs(packetLoss - currentPeer.packetLoss)) / 4;
+                    currentPeer.packetLoss = (currentPeer.packetLoss * 7 + packetLoss) / 8;
+
+                    currentPeer.packetLossEpoch = this.serviceTime;
+                    currentPeer.packetsSent = 0;
+                    currentPeer.packetsLost = 0;
+                }
+
+                CSENetProtoHeader header = new();
+                if ((this.headerFlags & (int)CSENetProtoFlag.HeaderFalgSentTime) != 0)
+                {
+                    header.sentTime = (uint)IPAddress.HostToNetworkOrder(this.serviceTime & 0xFFFF);
+                }
+
+                if (currentPeer.outPeerID < (int)CSENetDef.ProtoMaxPeerID)
+                    this.headerFlags |= currentPeer.outSessionID << (int)CSENetProtoFlag.HeaderSessionShift;
+                header.peerID = (uint)IPAddress.HostToNetworkOrder(currentPeer.outPeerID | this.headerFlags);
+
+                byte[]? buffer = CSENetUtils.Serialize<CSENetProtoHeader>(header);
+                if (buffer != null)
+                {
+                    this.buffers.Add(buffer);
+                }
+
+                currentPeer.lastSendTime = this.serviceTime;
+
+                if (this.socket != null)
+                    sentLength = this.socket.SendTo(currentPeer.address, this.buffers);
+
+                ProtoRemoveSentUnreliableCommands(currentPeer);
+
+                if (sentLength < 0)
+                    return -1;
+
+                this.totalSentData += (uint)sentLength;
+                this.totalSentPackets++;
             }
         }
 
