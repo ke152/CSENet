@@ -458,6 +458,100 @@ public class CSENetHost
         return ProtoDispatchIncomingCommands(ref @event);
     }
 
+    public int HostService(ENetEvent? @event, long timeout)
+    {
+        if (@event != null)
+        {
+            @event.type = ENetEventType.None;
+            @event.peer = null;
+            @event.packet = null;
+
+            switch (ProtoDispatchIncomingCommands(ref @event))
+            {
+                case 1:
+                    return 1;
+                case -1:
+                    return -1;
+                default:
+                    break;
+            }
+        }
+
+        this.serviceTime = Utils.TimeGet();
+
+        timeout += this.serviceTime;
+        bool waitSuccess = false;
+        do
+        {
+            if (Math.Abs(this.serviceTime - this.bandwidthThrottleEpoch) >= (uint)ENetDef.HostBandwidthThrottleInterval)
+                BandwidthThrottle();
+
+            switch (ProtoSendOutCmds(@event, 1))
+            {
+                case 1:
+                    return 1;
+                case -1:
+                    return -1;
+                default:
+                    break;
+            }
+
+            switch (ProtoReceiveIncomingCommands(@event))
+            {
+                case 1:
+                    return 1;
+                case -1:
+                    return -1;
+                default:
+                    break;
+            }
+
+            switch (ProtoSendOutCmds(@event, 1))
+            {
+                case 1:
+                    return 1;
+                case -1:
+                    return -1;
+                default:
+                    break;
+            }
+
+            if (@event != null)
+            {
+                switch (ProtoDispatchIncomingCommands(ref @event))
+                {
+                    case 1:
+                        return 1;
+                    case -1:
+                        return -1;
+                    default:
+                        break;
+                }
+            }
+
+            if (this.serviceTime >= timeout)
+                return 0;
+
+            do
+            {
+                this.serviceTime = Utils.TimeGet();
+
+                if (this.serviceTime >= timeout)
+                    return 0;
+
+                if (this.socket == null)
+                    return -1;
+                waitSuccess = this.socket.Wait((int)Math.Abs(timeout - this.serviceTime), SelectMode.SelectRead);
+            }
+            while (!waitSuccess);
+
+            this.serviceTime = Utils.TimeGet();
+        } while (waitSuccess);
+
+        return 0;
+    }
+
+
     #region proto
 
     public void ProtoChangeState(CSENetPeer peer, CSENetPeerState state)
@@ -1142,10 +1236,6 @@ public class CSENetHost
 
         return 0;
     }
-
-
-
-
 
     #endregion
 
