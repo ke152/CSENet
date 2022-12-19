@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Net.Sockets;
 using System.Runtime.InteropServices;
 
 namespace CSENet;
@@ -458,11 +459,11 @@ public class CSENetHost
         return ProtoDispatchIncomingCommands(ref @event);
     }
 
-    public int HostService(ENetEvent? @event, long timeout)
+    public int HostService(CSENetEvent? @event, long timeout)
     {
         if (@event != null)
         {
-            @event.type = ENetEventType.None;
+            @event.type = CSENetEventType.None;
             @event.peer = null;
             @event.packet = null;
 
@@ -477,13 +478,13 @@ public class CSENetHost
             }
         }
 
-        this.serviceTime = Utils.TimeGet();
+        this.serviceTime = CSENetUtils.TimeGet();
 
         timeout += this.serviceTime;
         bool waitSuccess = false;
         do
         {
-            if (Math.Abs(this.serviceTime - this.bandwidthThrottleEpoch) >= (uint)ENetDef.HostBandwidthThrottleInterval)
+            if (Math.Abs(this.serviceTime - this.bandwidthThrottleEpoch) >= (uint)CSENetDef.HostBandwidthThrottleInterval)
                 BandwidthThrottle();
 
             switch (ProtoSendOutCmds(@event, 1))
@@ -534,7 +535,7 @@ public class CSENetHost
 
             do
             {
-                this.serviceTime = Utils.TimeGet();
+                this.serviceTime = CSENetUtils.TimeGet();
 
                 if (this.serviceTime >= timeout)
                     return 0;
@@ -545,7 +546,7 @@ public class CSENetHost
             }
             while (!waitSuccess);
 
-            this.serviceTime = Utils.TimeGet();
+            this.serviceTime = CSENetUtils.TimeGet();
         } while (waitSuccess);
 
         return 0;

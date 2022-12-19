@@ -1,6 +1,6 @@
 ﻿namespace CSENet;
 
-enum CSENetEventType
+public enum CSENetEventType
 {
     None = 0,
     Connect = 1,
