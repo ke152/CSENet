@@ -168,31 +168,7 @@ public class CSENetProto
     {//TODO:这个构造函数可能需要改？不需要所有的都new出来吧？
         this.header = new();
     }
-}
 
-static class CSENetProtoCmdSize
-{
-    public static List<uint> CmdSize = Init();
-
-    private static List<uint> Init()
-    {
-        List<uint> cmdSizeList = new List<uint>();
-
-        cmdSizeList.Add(0);
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoAck>()));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoConnect>()));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoVerifyConnect>()));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoDisconnect>()));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoPing>()));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoSendReliable>()));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoSendUnReliable>()));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoSendUnsequenced>()));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoBandwidthLimit>()));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoThrottleConfigure>()));
-        cmdSizeList.Add(Convert.ToUInt32(Marshal.SizeOf<CSENetProtoSendFragment>()));
-
-        return cmdSizeList;
-    }
 };
 
 

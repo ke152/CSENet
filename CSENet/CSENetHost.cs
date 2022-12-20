@@ -997,7 +997,11 @@ public class CSENetHost
                 canPing = 0;
             }//if
 
-            commandSize = CSENetProtoCmdSize.CmdSize[outgoingCommand.cmdHeader.cmdFlag & (int)CSENetProtoCmdType.Mask];
+            CSENetProto command = outgoingCommand.cmd;
+            byte[]? buffer = CSENetUtils.Serialize<CSENetProto>(command);
+            if (buffer == null) continue;
+
+            commandSize = Convert.ToUInt32(buffer.Length);
             if (this.CommandCount > CSENetDef.ProtoMaxPacketCmds ||
                 this.BufferCount >= CSENetDef.BufferMax ||
                 peer.mtu - this.packetSize < commandSize ||
@@ -1073,36 +1077,7 @@ public class CSENetHost
                     peer.sentUnreliableCmds.Add(currentCommand);
             }
 
-            CSENetProto command = outgoingCommand.cmd;
-            byte[]? buffer = null;
-
-            //TODO:这里得替换，似乎有点不对，后面再看看
-            buffer = CSENetUtils.Serialize<CSENetProto>(command);
-            //switch (command.header.cmdFlag & (int)CSENetProtoCmdType.Mask)
-            //{
-            //    case (int)CSENetProtoCmdType.Ack:
-            //        buffer = CSENetUtils.Serialize<CSENetProtoAck>(command.ack);
-            //        break;
-            //    case (int)ENetProtoCmdType.Connect:
-            //        buffer = CSENetUtils.Serialize<CSENetProtoConnect>(command.connect);
-            //        break;
-            //    //VerifyConnect = 3,
-            //    //Disconnect = 4,
-            //    //Ping = 5,
-            //    //SendReliable = 6,
-            //    //SendUnreliable = 7,
-            //    //SendFragment = 8,
-            //    //SendUnseq = 9,
-            //    //BandwidthLimit = 10,
-            //    //ThrottleConfig = 11,
-            //    //SendUnreliableFragment = 12,
-            //    //Count = 13,
-            //    default:
-            //        break;
-            //}
             if (buffer == null) continue;
-            //buffer->data = command;
-            //buffer->dataLength = commandSize;
 
             this.packetSize += (uint)buffer.Length;
 
@@ -1245,7 +1220,6 @@ public class CSENetHost
     public int ProtoHandleIncomingCommands(CSENetEvent? @event)//TODO:delete
     {
         CSENetProtoHeader? header;
-        CSENetProtoCmdHeader? commandHeader;
         CSENetPeer? peer = null;
         int currentDataIdx = 0;
         int headerSize = Marshal.SizeOf<CSENetProtoHeader>();
@@ -1265,6 +1239,7 @@ public class CSENetHost
         byte[] headerBytes = CSENetUtils.SubBytes(this.receivedData, 0, headerSize);
 
         header = CSENetUtils.DeSerialize<CSENetProtoHeader>(headerBytes);
+        if (header == null) return -1;
 
         peerID = CSENetUtils.NetToHostOrder(header.peerID);
         sessionID = (peerID & (int)CSENetProtoFlag.HeaderSessionMask) >> (int)CSENetProtoFlag.HeaderSessionShift;
@@ -1314,21 +1289,14 @@ public class CSENetHost
         while (currentDataIdx < this.receivedDataLength)
         {
             int commandNumber;
-            int commandSize;
 
+            int commandSize = Convert.ToInt32(CSENetUtils.SubBytes(this.receivedData, currentDataIdx, 4));
+            byte[] objBytes = CSENetUtils.SubBytes(this.receivedData, currentDataIdx+4, commandSize);
+            CSENetProto? proto = CSENetUtils.DeSerialize<CSENetProto>(objBytes);
+            if (proto == null) continue;
 
-            if (currentDataIdx + Marshal.SizeOf<CSENetProtoCmdHeader>() > this.receivedDataLength)//TODO:所有sizeof都用这种形式
-                break;
-
-            byte[] objBytes = CSENetUtils.SubBytes(this.receivedData, currentDataIdx, Marshal.SizeOf<CSENetProtoCmdHeader>());
-            commandHeader = CSENetUtils.DeSerialize<CSENetProtoCmdHeader>(objBytes);
-
-            commandNumber = commandHeader.cmdFlag & (int)CSENetProtoCmdType.Mask;
+            commandNumber = proto.header.cmdFlag & (int)CSENetProtoCmdType.Mask;
             if (commandNumber >= (int)CSENetProtoCmdType.Count)
-                break;
-
-            commandSize = Convert.ToInt32(CSENetProtoCmdSize.CmdSize[commandNumber]);
-            if (commandSize == 0 || currentDataIdx + commandSize > this.receivedDataLength)
                 break;
 
             int commandStartIdx = currentDataIdx;
@@ -1337,19 +1305,19 @@ public class CSENetHost
             if (peer == null && commandNumber != (int)CSENetProtoCmdType.Connect)
                 break;
 
-            commandHeader.reliableSeqNum = CSENetUtils.NetToHostOrder(commandHeader.reliableSeqNum);
+            proto.header.reliableSeqNum = CSENetUtils.NetToHostOrder(proto.header.reliableSeqNum);
 
             switch (commandNumber)
             {
                 case (int)CSENetProtoCmdType.Ack:
-                    if (peer == null || ProtoHandleAcknowledge(@event, peer, commandHeader, commandStartIdx, commandSize) != 0)
+                    if (peer == null || ProtoHandleAcknowledge(@event, peer, proto.header, commandStartIdx, commandSize) != 0)
                         goto commandError;
                     break;
 
                 case (int)CSENetProtoCmdType.Connect:
                     if (peer != null)
                         goto commandError;
-                    peer = ProtoHandleConnect(commandHeader, commandStartIdx, commandSize);
+                    peer = ProtoHandleConnect(proto.header, commandStartIdx, commandSize);
                     if (peer == null)
                         goto commandError;
                     break;
@@ -1360,7 +1328,7 @@ public class CSENetHost
                     break;
 
                 case (int)CSENetProtoCmdType.Disconnect:
-                    if (peer == null || ProtoHandleDisconnect(commandHeader, peer, commandStartIdx, commandSize) != 0)
+                    if (peer == null || ProtoHandleDisconnect(proto.header, peer, commandStartIdx, commandSize) != 0)
                         goto commandError;
                     break;
 
@@ -1370,37 +1338,37 @@ public class CSENetHost
                     break;
 
                 case (int)CSENetProtoCmdType.SendReliable:
-                    if (peer == null || ProtoHandleSendReliable(commandHeader, peer, commandStartIdx, commandSize, ref currentDataIdx) != 0)
+                    if (peer == null || ProtoHandleSendReliable(proto.header, peer, commandStartIdx, commandSize, ref currentDataIdx) != 0)
                         goto commandError;
                     break;
 
                 case (int)CSENetProtoCmdType.SendFragment:
-                    if (peer == null || ProtoHandleSendFragment(commandHeader, peer, commandStartIdx, commandSize, ref currentDataIdx) != 0)
+                    if (peer == null || ProtoHandleSendFragment(proto.header, peer, commandStartIdx, commandSize, ref currentDataIdx) != 0)
                         goto commandError;
                     break;
 
                 case (int)CSENetProtoCmdType.SendUnreliable:
-                    if (peer == null || ProtoHandleSendUnreliable(commandHeader, peer, commandStartIdx, commandSize, ref currentDataIdx) != 0)
+                    if (peer == null || ProtoHandleSendUnreliable(proto.header, peer, commandStartIdx, commandSize, ref currentDataIdx) != 0)
                         goto commandError;
                     break;
 
                 case (int)CSENetProtoCmdType.SendUnreliableFragment:
-                    if (peer == null || ProtoHandleSendUnreliableFragment(commandHeader, peer, commandStartIdx, commandSize, ref currentDataIdx) != 0)
+                    if (peer == null || ProtoHandleSendUnreliableFragment(proto.header, peer, commandStartIdx, commandSize, ref currentDataIdx) != 0)
                         goto commandError;
                     break;
 
                 case (int)CSENetProtoCmdType.SendUnseq:
-                    if (peer == null || ProtoHandleSendUnsequenced(commandHeader, peer, commandStartIdx, commandSize, ref currentDataIdx) != 0)
+                    if (peer == null || ProtoHandleSendUnsequenced(proto.header, peer, commandStartIdx, commandSize, ref currentDataIdx) != 0)
                         goto commandError;
                     break;
 
                 case (int)CSENetProtoCmdType.BandwidthLimit:
-                    if (peer == null || ProtoHandleBandwidthLimit(commandHeader, peer, commandStartIdx, commandSize) != 0)
+                    if (peer == null || ProtoHandleBandwidthLimit(proto.header, peer, commandStartIdx, commandSize) != 0)
                         goto commandError;
                     break;
 
                 case (int)CSENetProtoCmdType.ThrottleConfig:
-                    if (peer == null || ProtoHandleThrottleConfigure(commandHeader, peer, commandStartIdx, commandSize) != 0)
+                    if (peer == null || ProtoHandleThrottleConfigure(proto.header, peer, commandStartIdx, commandSize) != 0)
                         goto commandError;
                     break;
 
@@ -1409,7 +1377,7 @@ public class CSENetHost
             }
 
             if (peer != null &&
-                (commandHeader.cmdFlag & (int)CSENetProtoFlag.CmdFlagAck) != 0)
+                (proto.header.cmdFlag & (int)CSENetProtoFlag.CmdFlagAck) != 0)
             {
                 uint sentTime;
 
@@ -1427,12 +1395,12 @@ public class CSENetHost
                         break;
 
                     case CSENetPeerState.AckDisconnect:
-                        if ((commandHeader.cmdFlag & (int)CSENetProtoCmdType.Mask) == (int)CSENetProtoCmdType.Disconnect)
-                            peer.QueueAck(commandHeader, sentTime);
+                        if ((proto.header.cmdFlag & (int)CSENetProtoCmdType.Mask) == (int)CSENetProtoCmdType.Disconnect)
+                            peer.QueueAck(proto.header, sentTime);
                         break;
 
                     default:
-                        peer.QueueAck(commandHeader, sentTime);
+                        peer.QueueAck(proto.header, sentTime);
                         break;
                 }
             }
