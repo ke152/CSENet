@@ -459,15 +459,15 @@ public class CSENetHost
         return ProtoDispatchIncomingCommands(ref @event);
     }
 
-    public int HostService(CSENetEvent? @event, long timeout)
+    public int HostService(CSENetEvent? evt, long timeout)
     {
-        if (@event != null)
+        if (evt != null)
         {
-            @event.type = CSENetEventType.None;
-            @event.peer = null;
-            @event.packet = null;
+            evt.type = CSENetEventType.None;
+            evt.peer = null;
+            evt.packet = null;
 
-            switch (ProtoDispatchIncomingCommands(ref @event))
+            switch (ProtoDispatchIncomingCommands(ref evt))
             {
                 case 1:
                     return 1;
@@ -480,14 +480,14 @@ public class CSENetHost
 
         this.serviceTime = CSENetUtils.TimeGet();
 
-        timeout += this.serviceTime;
+        timeout += this.serviceTime;//超时绝对时间
         bool waitSuccess = false;
         do
         {
-            if (Math.Abs(this.serviceTime - this.bandwidthThrottleEpoch) >= (uint)CSENetDef.HostBandwidthThrottleInterval)
+            if (NeedCheckBandwidthThrottle())
                 BandwidthThrottle();
 
-            switch (ProtoSendOutCmds(@event, 1))
+            switch (ProtoSendOutCmds(evt, 1))
             {
                 case 1:
                     return 1;
@@ -497,7 +497,7 @@ public class CSENetHost
                     break;
             }
 
-            switch (ProtoReceiveIncomingCommands(@event))
+            switch (ProtoReceiveIncomingCommands(evt))
             {
                 case 1:
                     return 1;
@@ -507,7 +507,7 @@ public class CSENetHost
                     break;
             }
 
-            switch (ProtoSendOutCmds(@event, 1))
+            switch (ProtoSendOutCmds(evt, 1))
             {
                 case 1:
                     return 1;
@@ -517,9 +517,9 @@ public class CSENetHost
                     break;
             }
 
-            if (@event != null)
+            if (evt != null)
             {
-                switch (ProtoDispatchIncomingCommands(ref @event))
+                switch (ProtoDispatchIncomingCommands(ref evt))
                 {
                     case 1:
                         return 1;
@@ -550,6 +550,11 @@ public class CSENetHost
         } while (waitSuccess);
 
         return 0;
+    }
+
+    private bool NeedCheckBandwidthThrottle()
+    {
+        return Math.Abs(this.serviceTime - this.bandwidthThrottleEpoch) >= (uint)CSENetDef.HostBandwidthThrottleInterval;
     }
 
 
@@ -1246,7 +1251,7 @@ public class CSENetHost
         flags = peerID & (int)CSENetProtoFlag.HeaderFalgMASK;
         peerID &= ~((uint)CSENetProtoFlag.HeaderFalgMASK | (uint)CSENetProtoFlag.HeaderSessionMask);
 
-        //TODO：这里最后得0，是原先(uint)&((ENetProtoHeader*)0)->sentTime;，不是很理解，先用0代替
+        //TODO：这里最后的0，是原先(uint)&((ENetProtoHeader*)0)->sentTime;，不是很理解，先用0代替
         headerSize = (flags & (int)CSENetProtoFlag.HeaderFalgSentTime) != 0 ? (int)headerSize : 0;
 
         if (peerID == (int)CSENetDef.ProtoMaxPeerID)
