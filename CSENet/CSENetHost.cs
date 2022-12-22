@@ -19,9 +19,10 @@ public class CSENetHost
     public uint channelLimit;                /**< maximum number of channels allowed for connected peers */
     public long serviceTime;
     public List<CSENetPeer> dispatchQueue = new();
-    public int continueSending;
+    public bool IfContinueSending;
     public uint packetSize;
-    public uint headerFlags;
+    public CSENetProtoFlag headerFlags;
+    public uint SessionID = -1;
     public List<CSENetProto> commands = new();// 不能超过：ENetDef.ProtoMaxPacketCmds
     public int CommandCount { get { return this.commands.Count; } }
     public List<byte[]> buffers = new();//不能超过： ENetDef.BufferMax
@@ -857,7 +858,7 @@ public class CSENetHost
                 this.BufferCount >= CSENetDef.BufferMax ||
                 peer.mtu - this.packetSize < Marshal.SizeOf<CSENetProtoAck>())
             {
-                this.continueSending = 1;
+                this.IfContinueSending = 1;
 
                 break;
             }
@@ -958,7 +959,7 @@ public class CSENetHost
             currentCommand = peer.outCmds[i];
             outgoingCommand = currentCommand;
 
-            if ((outgoingCommand.cmdHeader.cmdFlag & (int)CSENetProtoFlag.CmdFlagAck) != 0)
+            if ( !outgoingCommand.cmdHeader.ProtoFlag.HasFlag(CSENetProtoFlag.CmdFlagAck) )
             {
                 channel = outgoingCommand.cmdHeader.channelID < peer.ChannelCount ? peer.channels?[outgoingCommand.cmdHeader.channelID] : null;
                 reliableWindow = outgoingCommand.reliableSeqNum / (uint)CSENetDef.PeerReliableWindowSize;
@@ -1013,14 +1014,14 @@ public class CSENetHost
                 (outgoingCommand.packet != null &&
                 (uint)(peer.mtu - this.packetSize) < (uint)(commandSize + outgoingCommand.fragmentLength)))
             {
-                this.continueSending = 1;
+                this.IfContinueSending = true;
 
                 break;
             }
 
             i++;
 
-            if ((outgoingCommand.cmdHeader.cmdFlag & (int)CSENetProtoFlag.CmdFlagAck) != 0)
+            if ( !outgoingCommand.cmdHeader.ProtoFlag.HasFlag(CSENetProtoFlag.CmdFlagAck) )
             {
                 if (channel != null && outgoingCommand.sendAttempts < 1)
                 {
@@ -1044,7 +1045,7 @@ public class CSENetHost
 
                 outgoingCommand.sentTime = this.serviceTime;
 
-                this.headerFlags |= (int)CSENetProtoFlag.HeaderFalgSentTime;
+                this.headerFlags |= CSENetProtoFlag.HeaderFalgSentTime;
 
                 peer.reliableDataInTransit += outgoingCommand.fragmentLength;
             }
@@ -1096,7 +1097,7 @@ public class CSENetHost
 
                 this.packetSize += outgoingCommand.fragmentLength;
 
-                this.buffers.Add(newBuffer);
+                this.buffers.Add(newBuffer);//TODO:分片的发送逻辑，等待重构
             }
 
             ++peer.packetsSent;
@@ -1114,24 +1115,18 @@ public class CSENetHost
 
     public int ProtoSendOutCmds(CSENetEvent? @event, int checkForTimeouts)
     {
-        CSENetPeer currentPeer;
-        int currPeerIdx = 0;
         int sentLength = 0;
 
         if (this.peers == null || this.peers.Length == 0)
             return -1;
 
-        this.continueSending = 1;
+        this.IfContinueSending = true;
 
-        while (this.continueSending != 0)
+        while (this.IfContinueSending)
         {
-            for (this.continueSending = 0,
-                  currPeerIdx = 0;
-                 currPeerIdx < this.peers.Length;
-                 ++currPeerIdx)
+            this.IfContinueSending = false;
+            foreach (CSENetPeer currentPeer in this.peers)
             {
-                currentPeer = this.peers[currPeerIdx];
-
                 if (currentPeer.state == CSENetPeerState.Disconnected ||
                     currentPeer.state == CSENetPeerState.Zombie)
                     continue;
@@ -1139,7 +1134,6 @@ public class CSENetHost
                 this.headerFlags = 0;
                 this.commands.Clear();
                 this.buffers.Clear();
-                this.packetSize = (uint)Marshal.SizeOf<CSENetProtoHeader>();
 
                 if (currentPeer.acknowledgements.Count > 0)
                     ProtoSendAcknowledgements(currentPeer);
@@ -1158,8 +1152,7 @@ public class CSENetHost
                 if ((currentPeer.outCmds.Count == 0 ||
                       ProtoCheckOutgoingCommands(currentPeer) != 0) &&
                     currentPeer.sentReliableCmds.Count == 0 &&
-                    Math.Abs(this.serviceTime - currentPeer.lastReceiveTime) >= currentPeer.pingInterval &&
-                    currentPeer.mtu - this.packetSize >= Marshal.SizeOf<CSENetProtoPing>())
+                    Math.Abs(this.serviceTime - currentPeer.lastReceiveTime) >= currentPeer.pingInterval )
                 {
                     currentPeer.Ping();
                     ProtoCheckOutgoingCommands(currentPeer);
@@ -1170,10 +1163,10 @@ public class CSENetHost
 
                 if (currentPeer.packetLossEpoch == 0)
                     currentPeer.packetLossEpoch = this.serviceTime;
-                else
-                if (Math.Abs(this.serviceTime - currentPeer.packetLossEpoch) >= (uint)CSENetDef.PeerPacketLossInterval &&
+                else if (Math.Abs(this.serviceTime - currentPeer.packetLossEpoch) >= (uint)CSENetDef.PeerPacketLossInterval &&
                     currentPeer.packetsSent > 0)
                 {
+                    //超时，就增大packetLoss
                     uint packetLoss = currentPeer.packetsLost * (uint)CSENetDef.PeerPacketLossScale / currentPeer.packetsSent;
 
                     currentPeer.packetLossVariance = (currentPeer.packetLossVariance * 3 + Math.Abs(packetLoss - currentPeer.packetLoss)) / 4;
@@ -1185,14 +1178,15 @@ public class CSENetHost
                 }
 
                 CSENetProtoHeader header = new();
-                if ((this.headerFlags & (int)CSENetProtoFlag.HeaderFalgSentTime) != 0)
+                if ( this.headerFlags.HasFlag(CSENetProtoFlag.HeaderFalgSentTime) )
                 {
                     header.sentTime = (uint)IPAddress.HostToNetworkOrder(this.serviceTime & 0xFFFF);
                 }
 
                 if (currentPeer.outPeerID < (int)CSENetDef.ProtoMaxPeerID)
-                    this.headerFlags |= currentPeer.outSessionID << (int)CSENetProtoFlag.HeaderSessionShift;
-                header.peerID = (uint)IPAddress.HostToNetworkOrder(currentPeer.outPeerID | this.headerFlags);
+                    this.SessionID = currentPeer.outSessionID;
+
+                header.peerID = (uint)IPAddress.HostToNetworkOrder(currentPeer.outPeerID);
 
                 byte[]? buffer = CSENetUtils.Serialize<CSENetProtoHeader>(header);
                 if (buffer != null)

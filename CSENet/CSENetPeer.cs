@@ -184,7 +184,6 @@ public class CSENetPeer
 
     public void SetupOutCmd(CSENetOutCmd outCmd)
     {
-        outDataTotal += (int)CSENetProtoCmdSize.CmdSize[Convert.ToInt32(outCmd.cmdHeader.cmdFlag & (int)CSENetProtoCmdType.Mask)] + (int)outCmd.fragmentLength;
 
         if (outCmd.cmdHeader.channelID == 0xFF)
         {
@@ -197,7 +196,7 @@ public class CSENetPeer
         {
             CSENetChannel channel = channels[outCmd.cmdHeader.channelID];
 
-            if ((outCmd.cmdHeader.cmdFlag & (int)CSENetProtoFlag.CmdFlagAck) != 0)
+            if ( !outCmd.cmdHeader.ProtoFlag.HasFlag(CSENetProtoFlag.CmdFlagAck) )
             {
                 ++channel.outReliableSeqNum;
                 channel.outUnreliableSeqNum = 0;
@@ -207,7 +206,7 @@ public class CSENetPeer
             }
             else
             {
-                if ((outCmd.cmdHeader.cmdFlag & (int)CSENetProtoFlag.CmdFlagUnSeq) != 0)
+                if ( !outCmd.cmdHeader.ProtoFlag.HasFlag(CSENetProtoFlag.CmdFlagUnSeq) )
                 {
                     ++outUnSeqGroup;
 
@@ -231,14 +230,14 @@ public class CSENetPeer
         outCmd.rttTimeoutLimit = 0;
         outCmd.cmdHeader.reliableSeqNum = CSENetUtils.HostToNetOrder(outCmd.reliableSeqNum);
 
-        switch (outCmd.cmdHeader.cmdFlag & (int)CSENetProtoCmdType.Mask)
+        switch (outCmd.cmdHeader.CmdType)
         {
-            case (int)CSENetProtoCmdType.SendUnreliable:
+            case CSENetProtoCmdType.SendUnreliable:
                 if (outCmd.cmd.sendUnReliable != null)
                     outCmd.cmd.sendUnReliable.unreliableSeqNum = CSENetUtils.HostToNetOrder(outCmd.unreliableSeqNum);
                 break;
 
-            case (int)CSENetProtoCmdType.SendUnseq:
+            case CSENetProtoCmdType.SendUnseq:
                 if (outCmd.cmd.sendUnseq != null)
                     outCmd.cmd.sendUnseq.unseqGroup = CSENetUtils.HostToNetOrder(outUnSeqGroup);
                 break;
@@ -246,6 +245,8 @@ public class CSENetPeer
             default:
                 break;
         }
+
+        outDataTotal += CSENetUtils.Serialize(outCmd).Length;
         outCmds.Add(outCmd);
     }
 
@@ -471,7 +472,7 @@ public class CSENetPeer
         channel = channels[Convert.ToInt32(channelID)];
         fragmentLength = mtu;
 
-        if (packet.DataLength > fragmentLength)
+        if (packet.DataLength > fragmentLength)//TODO：这里用packet.DataLength和分片做比较是不合理的，后面看看怎么改
         {
             //分片
             return _SendFragment(channelID, packet, channel, ref fragmentLength);
@@ -486,23 +487,25 @@ public class CSENetPeer
     {
         cmd.header.channelID = channelID;
 
-        if ((packet.Flags & ((int)CSENetPacketFlag.Reliable | (int)CSENetPacketFlag.UnSeq)) == (int)CSENetPacketFlag.UnSeq)
+        if ( !packet.Flags.HasFlag(CSENetPacketFlag.Reliable) && packet.Flags.HasFlag(CSENetPacketFlag.UnSeq) )
         {
-            cmd.header.cmdFlag = (int)CSENetProtoCmdType.SendUnseq | (int)CSENetProtoFlag.CmdFlagUnSeq;
+            cmd.header.CmdType = CSENetProtoCmdType.SendUnseq;
+            cmd.header.ProtoFlag = CSENetProtoFlag.CmdFlagUnSeq;
             cmd.sendUnseq = new();
             cmd.sendUnseq.dataLength = (uint)IPAddress.HostToNetworkOrder(packet.DataLength);
         }
         else
         {
             cmd.sendReliable = new();
-            if ((packet.Flags & (int)CSENetPacketFlag.Reliable) != 0 || channel.outUnreliableSeqNum >= 0xFFFF)
+            if (packet.Flags.HasFlag(CSENetPacketFlag.Reliable) || channel.outUnreliableSeqNum >= 0xFFFF)
             {
-                cmd.header.cmdFlag = (int)CSENetProtoCmdType.SendReliable | (int)CSENetProtoFlag.CmdFlagAck;
+                cmd.header.CmdType = CSENetProtoCmdType.SendReliable;
+                cmd.header.ProtoFlag = CSENetProtoFlag.CmdFlagAck;
                 cmd.sendReliable.dataLength = (uint)IPAddress.HostToNetworkOrder(packet.DataLength);
             }
             else
             {
-                cmd.header.cmdFlag = (int)CSENetProtoCmdType.SendReliable;
+                cmd.header.CmdType = CSENetProtoCmdType.SendReliable;
                 cmd.sendReliable.dataLength = (uint)IPAddress.HostToNetworkOrder(packet.DataLength);
             }
         }
@@ -515,7 +518,8 @@ public class CSENetPeer
     private int _SendFragment(uint channelID, CSENetPacket packet, CSENetChannel channel, ref uint fragmentLength)
     {
         uint fragmentCount = (packet.DataLength + fragmentLength - 1) / fragmentLength, fragmentNumber, fragmentOffset;
-        int cmdNum;
+        CSENetProtoCmdType cmdType;
+        CSENetProtoFlag protoFlag = 0;
         uint startSequenceNumber;
         List<CSENetOutCmd> fragments = new();
         CSENetOutCmd fragment;
@@ -523,15 +527,15 @@ public class CSENetPeer
         if (fragmentCount > CSENetDef.ProtoMaxFragmentCount)
             return -1;
 
-        if ((packet.Flags & ((int)CSENetPacketFlag.UnreliableFragment | (int)CSENetPacketFlag.Reliable)) == (int)CSENetPacketFlag.UnreliableFragment &&
-            channel.outUnreliableSeqNum < 0xFFFF)
+        if ( !packet.Flags.HasFlag(CSENetPacketFlag.Reliable) && packet.Flags.HasFlag(CSENetPacketFlag.UnreliableFragment) && channel.outUnreliableSeqNum < 0xFFFF)
         {
-            cmdNum = (int)CSENetProtoCmdType.SendUnreliableFragment;
+            cmdType = CSENetProtoCmdType.SendUnreliableFragment;
             startSequenceNumber = (uint)IPAddress.HostToNetworkOrder(channel.outUnreliableSeqNum + 1);
         }
         else
         {
-            cmdNum = (int)CSENetProtoCmdType.SendFragment | (int)CSENetProtoFlag.CmdFlagAck;
+            cmdType = CSENetProtoCmdType.SendFragment;
+            protoFlag = CSENetProtoFlag.CmdFlagAck;
             startSequenceNumber = (uint)IPAddress.HostToNetworkOrder(channel.outUnreliableSeqNum + 1);
         }
 
@@ -549,7 +553,8 @@ public class CSENetPeer
             fragment.fragmentOffset = fragmentOffset;
             fragment.fragmentLength = fragmentLength;
             fragment.packet = packet;
-            fragment.cmdHeader.cmdFlag = cmdNum;
+            fragment.cmdHeader.CmdType = cmdType;
+            fragment.cmdHeader.ProtoFlag = protoFlag;
             fragment.cmdHeader.channelID = channelID;
 
             fragment.cmd.sendFragment = new();
@@ -602,7 +607,8 @@ public class CSENetPeer
         if (this.state != CSENetPeerState.Connected)
             return;
 
-        command.header.cmdFlag = (int)CSENetProtoCmdType.Ping | (int)CSENetProtoFlag.CmdFlagAck;//TODO: cmdFlag改成2个不同的标志位
+        command.header.CmdType = CSENetProtoCmdType.Ping;
+        command.header.ProtoFlag  = CSENetProtoFlag.CmdFlagAck;
         command.header.channelID = 0xFF;
 
         QueueOutgoingCommand(command, null, 0, 0);

@@ -112,7 +112,7 @@ public class CSENetSocket
         return socket.Poll(microSecondsTimeout, mode);
     }
 
-    public int SendTo(IPEndPoint? ep, List<byte[]> buffers)//TODO:这个
+    public int SendTo(IPEndPoint? ep, List<byte[]> buffers)//TODO:批量发送，而不是一个一个发
     {
         if (ep == null) return 0;
 

@@ -1,7 +1,7 @@
 ﻿namespace CSENet;
 
 
-enum CSENetPacketFlag
+public enum CSENetPacketFlag
 {
     // TODO：if(flags & ENetPacketFlag.Reliable)  报错&结果为int，不能转bool
     //必须由对应peer接收；在确认发出前必须不断重发
@@ -22,11 +22,11 @@ public class CSENetPacket
     * An ENet data packet that may be sent to or received from a peer. The shown 
     * fields should only be read and never modified. 
     */
-    public int Flags;           /**< bitwise-or of ENetPacketFlag constants *///TODO: Flag改成两个，不要用int
+    public CSENetPacketFlag Flags;           /**< bitwise-or of ENetPacketFlag constants *///TODO: Flag改成两个，不要用int
     public byte[]? Data;            //allocated data for packet
     public uint DataLength { get { return this.Data == null ? 0 : Convert.ToUInt32(this.Data.Length); } }
 
-    public CSENetPacket(byte[]? data, int flags)
+    public CSENetPacket(byte[]? data, CSENetPacketFlag flags)
     {
         this.Data = data;
         this.Flags = flags;

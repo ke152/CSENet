@@ -4,6 +4,7 @@ namespace CSENet;
 
 public enum CSENetProtoFlag
 {
+    None = 0,
     CmdFlagUnSeq = (1 << 6),
     CmdFlagAck = (1 << 7),
 
@@ -42,20 +43,21 @@ public class CSENetProtoHeader
 
 public class CSENetProtoCmdHeader
 {
-    public int cmdFlag = 0;
+    public CSENetProtoCmdType CmdType;
+    public CSENetProtoFlag ProtoFlag;
     public uint channelID;
     public uint reliableSeqNum;
 
     public CSENetProtoCmdHeader()
     {
-        this.cmdFlag = 0;
         this.channelID = 0;
         this.reliableSeqNum = 0;
     }
 
-    public CSENetProtoCmdHeader(int cmdFlag, uint channelID, uint reliableSeqNum)
+    public CSENetProtoCmdHeader(CSENetProtoCmdType cmdType, CSENetProtoFlag protoFlag, uint channelID, uint reliableSeqNum)
     {
-        this.cmdFlag = cmdFlag;
+        this.CmdType = cmdType;
+        this.ProtoFlag = protoFlag;
         this.channelID = channelID;
         this.reliableSeqNum = reliableSeqNum;
     }
