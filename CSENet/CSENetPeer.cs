@@ -333,7 +333,7 @@ public class CSENetPeer
         {
             CSENetInCmd inCmd = currentCmd;
 
-            if ((inCmd.cmdHeader.cmdFlag & (int)CSENetProtoCmdType.Mask) == (int)CSENetProtoCmdType.SendUnseq)
+            if ( inCmd.cmdHeader.CmdType.HasFlag(CSENetProtoCmdType.SendUnseq) )
                 continue;
 
             if (inCmd.reliableSeqNum == channel.inReliableSeqNum)
@@ -626,7 +626,7 @@ public class CSENetPeer
         this.timeoutMaximum = timeoutMaximum != 0 ? timeoutMaximum : CSENetDef.PeerTimeoutMax;
     }
 
-    public CSENetInCmd? QueueInCmd(CSENetProtoCmdHeader cmdHeader, byte[]? data, uint dataLength, int flags, uint fragmentCount, uint sendUnreliableSeqNum = 0)
+    public CSENetInCmd? QueueInCmd(CSENetProtoCmdHeader cmdHeader, byte[]? data, uint dataLength, CSENetPacketFlag flags, uint fragmentCount, uint sendUnreliableSeqNum = 0)
     {
         CSENetInCmd dummyCmd = new();
 
@@ -641,7 +641,7 @@ public class CSENetPeer
         if (state == CSENetPeerState.DisconnectLater)
             goto discardcmd;
 
-        if ((cmdHeader.cmdFlag & (int)CSENetProtoCmdType.SendUnseq) != 0)
+        if ( cmdHeader.CmdType.HasFlag(CSENetProtoCmdType.SendUnseq) )
         {
             reliableSeqNum = cmdHeader.reliableSeqNum;
             reliableWindow = reliableSeqNum / CSENetDef.PeerReliableWindowSize;
@@ -654,10 +654,10 @@ public class CSENetPeer
                 goto discardcmd;
         }
 
-        switch (cmdHeader.cmdFlag & (int)CSENetProtoCmdType.Mask)
+        switch (cmdHeader.CmdType)
         {
-            case (int)CSENetProtoCmdType.SendFragment:
-            case (int)CSENetProtoCmdType.SendReliable:
+            case CSENetProtoCmdType.SendFragment:
+            case CSENetProtoCmdType.SendReliable:
                 if (reliableSeqNum == channel.inReliableSeqNum)
                     goto discardcmd;
 
@@ -685,8 +685,8 @@ public class CSENetPeer
                 }
                 break;
 
-            case (int)CSENetProtoCmdType.SendUnreliable:
-            case (int)CSENetProtoCmdType.SendUnreliableFragment:
+            case CSENetProtoCmdType.SendUnreliable:
+            case CSENetProtoCmdType.SendUnreliableFragment:
                 unreliableSeqNum = CSENetUtils.NetToHostOrder(sendUnreliableSeqNum);
 
                 if (reliableSeqNum == channel.inReliableSeqNum &&
@@ -698,7 +698,7 @@ public class CSENetPeer
                     currCmd = channel.inReliableCmds[i];
                     inCmd = currCmd;
 
-                    if ((cmdHeader.cmdFlag & (int)CSENetProtoCmdType.Mask) == (int)CSENetProtoCmdType.SendUnreliable)
+                    if ( cmdHeader.CmdType.HasFlag(CSENetProtoCmdType.SendUnreliable) )
                         continue;
 
                     if (reliableSeqNum >= channel.inReliableSeqNum)
@@ -726,7 +726,7 @@ public class CSENetPeer
                 }
                 break;
 
-            case (int)CSENetProtoCmdType.SendUnseq:
+            case CSENetProtoCmdType.SendUnseq:
                 currCmd = channel.inUnreliableCmds.Last();
                 break;
 
@@ -764,10 +764,10 @@ public class CSENetPeer
             channel.inReliableCmds.Insert(channel.inReliableCmds.IndexOf(currCmd) + 1, inCmd);
         }
 
-        switch (cmdHeader.cmdFlag & (int)CSENetProtoCmdType.Mask)
+        switch (cmdHeader.CmdType)
         {
-            case (int)CSENetProtoCmdType.SendFragment:
-            case (int)CSENetProtoCmdType.SendReliable:
+            case CSENetProtoCmdType.SendFragment:
+            case CSENetProtoCmdType.SendReliable:
                 DispatchInReliableCmds(channel, inCmd);
                 break;
             default:
@@ -795,7 +795,8 @@ public class CSENetPeer
         this.packetThrottleAcceleration = acceleration;
         this.packetThrottleDeceleration = deceleration;
 
-        command.header.cmdFlag = (int)CSENetProtoCmdType.ThrottleConfig | (int)CSENetProtoFlag.CmdFlagAck;
+        command.header.CmdType = CSENetProtoCmdType.ThrottleConfig;
+        command.header.ProtoFlag = CSENetProtoFlag.CmdFlagAck;
         command.header.channelID = 0xFF;
 
         command.throttleConfigure = new();
@@ -845,8 +846,10 @@ public class CSENetPeer
         {
             ResetQueues();
 
-            command.header.cmdFlag = (int)CSENetProtoCmdType.Disconnect | (int)CSENetProtoFlag.CmdFlagUnSeq;
+            command.header.CmdType = CSENetProtoCmdType.Disconnect;
+            command.header.ProtoFlag = CSENetProtoFlag.CmdFlagUnSeq;
             command.header.channelID = 0xFF;
+            command.disconnect = new();
             command.disconnect.data = (uint)IPAddress.HostToNetworkOrder(data);
 
             QueueOutgoingCommand(command, null, 0, 0);
@@ -881,16 +884,16 @@ public class CSENetPeer
 
         ResetQueues();
 
-        command.header.cmdFlag = (int)CSENetProtoCmdType.Disconnect;
+        command.header.CmdType = CSENetProtoCmdType.Disconnect;
         command.header.channelID = 0xFF;
 
         command.disconnect = new();
         command.disconnect.data = (uint)IPAddress.HostToNetworkOrder(data);
 
         if (this.state == CSENetPeerState.Connected || this.state == CSENetPeerState.DisconnectLater)
-            command.header.cmdFlag |= (int)CSENetProtoFlag.CmdFlagAck;
+            command.header.ProtoFlag |= CSENetProtoFlag.CmdFlagAck;
         else
-            command.header.cmdFlag |= (int)CSENetProtoFlag.CmdFlagUnSeq;
+            command.header.ProtoFlag |= CSENetProtoFlag.CmdFlagUnSeq;
 
         QueueOutgoingCommand(command, null, 0, 0);
 

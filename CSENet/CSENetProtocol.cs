@@ -167,7 +167,7 @@ public class CSENetProto
     public CSENetProtoThrottleConfigure? throttleConfigure;
 
     public CSENetProto()
-    {//TODO:这个构造函数可能需要改？不需要所有的都new出来吧？
+    {
         this.header = new();
     }
 
