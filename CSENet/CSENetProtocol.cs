@@ -165,6 +165,7 @@ public class CSENetProto
     public CSENetProtoSendFragment? sendFragment;
     public CSENetProtoBandwidthLimit? bandwidthLimit;
     public CSENetProtoThrottleConfigure? throttleConfigure;
+    public byte[]? packet;
 
     public CSENetProto()
     {

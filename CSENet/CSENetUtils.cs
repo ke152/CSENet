@@ -31,7 +31,6 @@ class CSENetUtils
         return Convert.ToUInt32(IPAddress.NetworkToHostOrder(Convert.ToInt32(value)));
     }
 
-
     public static byte[] Serialize<T>(T msg)
     {
         return Encoding.Default.GetBytes(JsonConvert.SerializeObject(msg));
@@ -62,6 +61,11 @@ class CSENetUtils
         }
 
         return result;
+    }
+
+    public static byte[] SubBytes(byte[] data, uint start, uint length)
+    {
+        return CSENetUtils.SubBytes(data, Convert.ToInt32(start), Convert.ToInt32(length));
     }
 }
 

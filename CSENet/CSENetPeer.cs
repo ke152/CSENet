@@ -179,6 +179,12 @@ public class CSENetPeer
         outCmd.fragmentLength = length;
         outCmd.packet = packet;
 
+        if (packet != null && packet.Data != null)
+        {
+            outCmd.cmd.packet = CSENetUtils.SubBytes(packet.Data, offset, length);
+
+        }
+
         SetupOutCmd(outCmd);
     }
 
@@ -251,12 +257,6 @@ public class CSENetPeer
     }
 
     //TODO:处理所有0引用的函数
-    //TODO:直接Clear不需要进行函数调用
-
-    public static void ResetCmds(List<CSENetOutCmd> list)
-    {
-        list.Clear();
-    }
 
     public static void RemoveInCmds(List<CSENetInCmd> list, CSENetInCmd? startCmd, CSENetInCmd? endCmd, CSENetInCmd? excludeCmd)
     {
@@ -553,6 +553,7 @@ public class CSENetPeer
             fragment.fragmentOffset = fragmentOffset;
             fragment.fragmentLength = fragmentLength;
             fragment.packet = packet;
+            fragment.cmd.packet = CSENetUtils.SubBytes(packet.Data, fragmentOffset, fragmentLength);
             fragment.cmdHeader.CmdType = cmdType;
             fragment.cmdHeader.ProtoFlag = protoFlag;
             fragment.cmdHeader.channelID = channelID;
