@@ -475,15 +475,15 @@ public class CSENetPeer
         if (packet.DataLength > fragmentLength)//TODO：这里用packet.DataLength和分片做比较是不合理的，后面看看怎么改
         {
             //分片
-            return _SendFragment(channelID, packet, channel, ref fragmentLength);
+            return SendFragment(channelID, packet, channel, ref fragmentLength);
         }
         else//不用分片的
         {
-            return _SendNoFragment(channelID, packet, channel, cmd);
+            return SendNoFragment(channelID, packet, channel, cmd);
         }
     }
 
-    private int _SendNoFragment(uint channelID, CSENetPacket packet, CSENetChannel channel, CSENetProto cmd)
+    private int SendNoFragment(uint channelID, CSENetPacket packet, CSENetChannel channel, CSENetProto cmd)
     {
         cmd.header.channelID = channelID;
 
@@ -515,7 +515,7 @@ public class CSENetPeer
         return 0;
     }
 
-    private int _SendFragment(uint channelID, CSENetPacket packet, CSENetChannel channel, ref uint fragmentLength)
+    private int SendFragment(uint channelID, CSENetPacket packet, CSENetChannel channel, ref uint fragmentLength)
     {
         uint fragmentCount = (packet.DataLength + fragmentLength - 1) / fragmentLength, fragmentNumber, fragmentOffset;
         CSENetProtoCmdType cmdType;
@@ -553,7 +553,10 @@ public class CSENetPeer
             fragment.fragmentOffset = fragmentOffset;
             fragment.fragmentLength = fragmentLength;
             fragment.packet = packet;
-            fragment.cmd.packet = CSENetUtils.SubBytes(packet.Data, fragmentOffset, fragmentLength);
+            if (packet.Data != null)
+            {
+                fragment.cmd.packet = CSENetUtils.SubBytes(packet.Data, fragmentOffset, fragmentLength);
+            }
             fragment.cmdHeader.CmdType = cmdType;
             fragment.cmdHeader.ProtoFlag = protoFlag;
             fragment.cmdHeader.channelID = channelID;
@@ -627,7 +630,7 @@ public class CSENetPeer
         this.timeoutMaximum = timeoutMaximum != 0 ? timeoutMaximum : CSENetDef.PeerTimeoutMax;
     }
 
-    public CSENetInCmd? QueueInCmd(CSENetProtoCmdHeader cmdHeader, byte[]? data, uint dataLength, CSENetPacketFlag flags, uint fragmentCount, uint sendUnreliableSeqNum = 0)
+    public CSENetInCmd? QueueInCmd(CSENetProtoCmdHeader cmdHeader, byte[]? data, CSENetPacketFlag flags, uint fragmentCount, uint sendUnreliableSeqNum = 0)
     {
         CSENetInCmd dummyCmd = new();
 
@@ -909,5 +912,107 @@ public class CSENetPeer
             this.host?.Flush();
             Reset();
         }
+    }
+
+    public void ProtoRemoveSentUnreliableCommands()
+    {
+        if (sentUnreliableCmds.Count == 0)
+            return;
+
+        sentUnreliableCmds?.Clear();
+
+        if (state == CSENetPeerState.DisconnectLater &&
+            outCmds.Count == 0 &&
+            sentReliableCmds.Count == 0)
+            Disconnect(@eventData);
+    }
+
+    public CSENetProtoCmdType ProtoRemoveSentReliableCommand(uint reliableSequenceNumber, uint channelID)
+    {
+        CSENetOutCmd? outgoingCommand = null;
+        CSENetProtoCmdType commandNumber = CSENetProtoCmdType.None;
+        int wasSent = 1;
+
+        foreach (var currentCommand in sentReliableCmds)
+        {
+            outgoingCommand = currentCommand;
+
+            if (outgoingCommand?.reliableSeqNum == reliableSequenceNumber &&
+                outgoingCommand?.cmdHeader.channelID == channelID)
+            {
+                sentReliableCmds.Remove(currentCommand);
+                break;
+            }
+        }
+
+        if (outgoingCommand == null)
+        {
+            foreach (var currentCommand in outCmds)
+            {
+                outgoingCommand = currentCommand;
+
+                if (outgoingCommand.cmdHeader.ProtoFlag.HasFlag(CSENetProtoFlag.CmdFlagAck))
+                    continue;
+
+                if (outgoingCommand?.sendAttempts < 1) return (int)CSENetProtoCmdType.None;
+
+                if (outgoingCommand?.reliableSeqNum == reliableSequenceNumber &&
+                    outgoingCommand?.cmdHeader.channelID == channelID)
+                {
+                    outCmds.Remove(currentCommand);
+                    break;
+                }
+            }
+
+            if (outgoingCommand == null)
+                return CSENetProtoCmdType.None;
+
+            wasSent = 0;
+        }
+
+        if (outgoingCommand == null)
+            return CSENetProtoCmdType.None;
+
+        if (channelID < ChannelCount && channels != null)
+        {
+            CSENetChannel channel = channels[channelID];
+            uint reliableWindow = reliableSequenceNumber / (uint)CSENetDef.PeerReliableWindowSize;
+            if (channel.reliableWindows[reliableWindow] > 0)
+            {
+                --channel.reliableWindows[reliableWindow];
+                if (channel.reliableWindows[reliableWindow] != 0)
+                    channel.usedReliableWindows &= ~(1 << (int)reliableWindow);
+            }
+        }
+
+        commandNumber = outgoingCommand.cmdHeader.CmdType;
+
+        if (outgoingCommand.packet != null)
+        {
+            if (wasSent != 0)
+                reliableDataInTransit -= outgoingCommand.fragmentLength;
+
+            outgoingCommand.packet = null;
+        }
+
+        if (sentReliableCmds.Count == 0)
+            return commandNumber;
+
+        outgoingCommand = sentReliableCmds.First();
+
+        if (outgoingCommand != null)
+        {
+            nextTimeout = outgoingCommand.sentTime + outgoingCommand.rttTimeout;
+        }
+
+        return commandNumber;
+    }
+
+    public int ProtoHandlePing()
+    {
+        if (state != CSENetPeerState.Connected && state != CSENetPeerState.DisconnectLater)
+            return -1;
+
+        return 0;
     }
 }

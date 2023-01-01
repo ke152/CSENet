@@ -669,19 +669,6 @@ public class CSENetHost
             ProtoDispatchState(peer, peer.state == CSENetPeerState.Connecting ? CSENetPeerState.ConnectionSucceed : CSENetPeerState.ConnectionPending);
     }
 
-    public void ProtoRemoveSentUnreliableCommands(CSENetPeer peer)
-    {
-        if (peer.sentUnreliableCmds.Count == 0)
-            return;
-
-        peer.sentUnreliableCmds?.Clear();
-
-        if (peer.state == CSENetPeerState.DisconnectLater &&
-            peer.outCmds.Count == 0 &&
-            peer.sentReliableCmds.Count == 0)
-            peer.Disconnect(peer.@eventData);
-    }
-
     public void ProtoNotifyDisconnect(CSENetPeer peer, CSENetEvent? @event)
     {
         if (peer.state >= CSENetPeerState.ConnectionPending)
@@ -706,87 +693,6 @@ public class CSENetHost
                 ProtoDispatchState(peer, CSENetPeerState.Zombie);
             }
         }
-    }
-
-    public CSENetProtoCmdType ProtoRemoveSentReliableCommand(CSENetPeer peer, uint reliableSequenceNumber, uint channelID)
-    {
-        CSENetOutCmd? outgoingCommand = null;
-        CSENetProtoCmdType commandNumber = CSENetProtoCmdType.None;
-        int wasSent = 1;
-
-        foreach (var currentCommand in peer.sentReliableCmds)
-        {
-            outgoingCommand = currentCommand;
-
-            if (outgoingCommand?.reliableSeqNum == reliableSequenceNumber &&
-                outgoingCommand?.cmdHeader.channelID == channelID)
-            {
-                peer.sentReliableCmds.Remove(currentCommand);
-                break;
-            }
-        }
-
-        if (outgoingCommand == null)
-        {
-            foreach (var currentCommand in peer.outCmds)
-            {
-                outgoingCommand = currentCommand;
-
-                if ( outgoingCommand.cmdHeader.ProtoFlag.HasFlag(CSENetProtoFlag.CmdFlagAck) )
-                    continue;
-
-                if (outgoingCommand?.sendAttempts < 1) return (int)CSENetProtoCmdType.None;
-
-                if (outgoingCommand?.reliableSeqNum == reliableSequenceNumber &&
-                    outgoingCommand?.cmdHeader.channelID == channelID)
-                {
-                    peer.outCmds.Remove(currentCommand);
-                    break;
-                }
-            }
-
-            if (outgoingCommand == null)
-                return CSENetProtoCmdType.None;
-
-            wasSent = 0;
-        }
-
-        if (outgoingCommand == null)
-            return CSENetProtoCmdType.None;
-
-        if (channelID < peer.ChannelCount && peer.channels != null)
-        {
-            CSENetChannel channel = peer.channels[channelID];
-            uint reliableWindow = reliableSequenceNumber / (uint)CSENetDef.PeerReliableWindowSize;
-            if (channel.reliableWindows[reliableWindow] > 0)
-            {
-                --channel.reliableWindows[reliableWindow];
-                if (channel.reliableWindows[reliableWindow] != 0)
-                    channel.usedReliableWindows &= ~(1 << (int)reliableWindow);
-            }
-        }
-
-        commandNumber = outgoingCommand.cmdHeader.CmdType;
-
-        if (outgoingCommand.packet != null)
-        {
-            if (wasSent != 0)
-                peer.reliableDataInTransit -= outgoingCommand.fragmentLength;
-
-            outgoingCommand.packet = null;
-        }
-
-        if (peer.sentReliableCmds.Count == 0)
-            return commandNumber;
-
-        outgoingCommand = peer.sentReliableCmds.First();
-
-        if (outgoingCommand != null)
-        {
-            peer.nextTimeout = outgoingCommand.sentTime + outgoingCommand.rttTimeout;
-        }
-
-        return commandNumber;
     }
 
     public int ProtoReceiveIncomingCommands(CSENetEvent? @event)
@@ -1205,7 +1111,7 @@ public class CSENetHost
                 if (this.socket != null)
                     sentLength = this.socket.SendTo(currentPeer.address, this.buffers);
 
-                ProtoRemoveSentUnreliableCommands(currentPeer);
+                currentPeer.ProtoRemoveSentUnreliableCommands();
 
                 if (sentLength < 0)
                     return -1;
@@ -1320,7 +1226,7 @@ public class CSENetHost
                 case CSENetProtoCmdType.Connect:
                     if (peer != null)
                         goto commandError;
-                    peer = ProtoHandleConnect(proto.header, commandStartIdx, commandSize);
+                    peer = ProtoHandleConnect(commandStartIdx, commandSize);
                     if (peer == null)
                         goto commandError;
                     break;
@@ -1366,12 +1272,12 @@ public class CSENetHost
                     break;
 
                 case CSENetProtoCmdType.BandwidthLimit:
-                    if (peer == null || ProtoHandleBandwidthLimit(proto.header, peer, commandStartIdx, commandSize) != 0)
+                    if (peer == null || ProtoHandleBandwidthLimit(peer, commandStartIdx, commandSize) != 0)
                         goto commandError;
                     break;
 
                 case CSENetProtoCmdType.ThrottleConfig:
-                    if (peer == null || ProtoHandleThrottleConfigure(proto.header, peer, commandStartIdx, commandSize) != 0)
+                    if (peer == null || ProtoHandleThrottleConfigure(peer, commandStartIdx, commandSize) != 0)
                         goto commandError;
                     break;
 
@@ -1488,7 +1394,7 @@ public class CSENetHost
 
         receivedReliableSequenceNumber = CSENetUtils.NetToHostOrder(ackCmd.receivedReliableSeqNum);
 
-        commandNumber = ProtoRemoveSentReliableCommand(peer, receivedReliableSequenceNumber, commandHeader.channelID);
+        commandNumber = peer.ProtoRemoveSentReliableCommand(receivedReliableSequenceNumber, commandHeader.channelID);
 
         switch (peer.state)
         {
@@ -1519,7 +1425,7 @@ public class CSENetHost
         return 0;
     }
 
-    public CSENetPeer? ProtoHandleConnect(CSENetProtoCmdHeader commandHeader, int commandStartIdx, int commandSize)
+    public CSENetPeer? ProtoHandleConnect(int commandStartIdx, int commandSize)
     {
         uint incomingSessionID, outgoingSessionID;
         uint mtu, windowSize;
@@ -1690,7 +1596,7 @@ public class CSENetHost
             return -1;
         }
 
-        ProtoRemoveSentReliableCommand(peer, 1, 0xFF);
+        peer.ProtoRemoveSentReliableCommand(1, 0xFF);
 
         peer.outPeerID = CSENetUtils.NetToHostOrder(verifyConnectCmd.outPeerID);
         peer.inSessionID = verifyConnectCmd.inSessionID;
@@ -1759,14 +1665,6 @@ public class CSENetHost
         return 0;
     }
 
-    public int ProtoHandlePing(CSENetPeer peer)
-    {
-        if (peer.state != CSENetPeerState.Connected && peer.state != CSENetPeerState.DisconnectLater)
-            return -1;
-
-        return 0;
-    }
-
     public int ProtoHandleSendUnreliable(CSENetProtoCmdHeader commandHeader, CSENetPeer peer, int commandStartIdx, int commandSize, ref int currentDataIdx)
     {
         uint dataLength;
@@ -1787,7 +1685,7 @@ public class CSENetHost
             currentDataIdx > this.receivedDataLength)
             return -1;
 
-        if (peer.QueueInCmd(commandHeader, packetData, dataLength, 0, 0, sendUnReliableCmd.unreliableSeqNum) == null)
+        if (peer.QueueInCmd(commandHeader, packetData, 0, 0, sendUnReliableCmd.unreliableSeqNum) == null)
             return -1;
 
         return 0;
@@ -1815,13 +1713,13 @@ public class CSENetHost
         if (this.receivedData.Length <= currentDataIdx)
             return -1;
 
-        if (peer.QueueInCmd(commandHeader, packetData, dataLength, (int)CSENetPacketFlag.Reliable, 0) == null)
+        if (peer.QueueInCmd(commandHeader, packetData, CSENetPacketFlag.Reliable, 0) == null)
             return -1;
 
         return 0;
     }
 
-    public int ProtoHandleBandwidthLimit(CSENetProtoCmdHeader commandHeader, CSENetPeer peer, int commandStartIdx, int commandSize)
+    public int ProtoHandleBandwidthLimit(CSENetPeer peer, int commandStartIdx, int commandSize)
     {
         if (peer.state != CSENetPeerState.Connected && peer.state != CSENetPeerState.DisconnectLater)
             return -1;
@@ -1942,7 +1840,7 @@ public class CSENetHost
         {
             commandHeader.reliableSeqNum = startSequenceNumber;
 
-            startCommand = peer.QueueInCmd(commandHeader, null, totalLength, (int)CSENetPacketFlag.Reliable, fragmentCount);
+            startCommand = peer.QueueInCmd(commandHeader, null, CSENetPacketFlag.Reliable, fragmentCount);
             if (startCommand == null)
                 return -1;
         }
@@ -1968,7 +1866,7 @@ public class CSENetHost
         return 0;
     }
 
-    public int ProtoHandleThrottleConfigure(CSENetProtoCmdHeader commandHeader, CSENetPeer peer, int commandStartIdx, int commandSize)
+    public int ProtoHandleThrottleConfigure(CSENetPeer peer, int commandStartIdx, int commandSize)
     {
         if (peer.state != CSENetPeerState.Connected && peer.state != CSENetPeerState.DisconnectLater)
             return -1;
@@ -2027,7 +1925,7 @@ public class CSENetHost
         byte[] packetData = CSENetUtils.SubBytes(this.receivedData, currentDataIdx, (int)dataLength);
         currentDataIdx += (int)dataLength;
 
-        if (peer.QueueInCmd(commandHeader, packetData, dataLength, (int)CSENetPacketFlag.UnSeq, 0) == null)
+        if (peer.QueueInCmd(commandHeader, packetData, CSENetPacketFlag.UnSeq, 0) == null)
             return -1;
 
         peer.unseqWindow[index / 32] |= (uint)(1 << ((int)index % 32));
@@ -2132,7 +2030,7 @@ public class CSENetHost
 
         if (startCommand == null)
         {
-            startCommand = peer.QueueInCmd(commandHeader, null, totalLength, (int)CSENetPacketFlag.UnreliableFragment, fragmentCount, sendFragmentCmd.startSeqNum);
+            startCommand = peer.QueueInCmd(commandHeader, null, CSENetPacketFlag.UnreliableFragment, fragmentCount, sendFragmentCmd.startSeqNum);
             if (startCommand == null)
                 return -1;
         }
