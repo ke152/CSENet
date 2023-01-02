@@ -3,6 +3,7 @@
 
 public enum CSENetPacketFlag
 {
+    None = 0,
     // TODO：if(flags & ENetPacketFlag.Reliable)  报错&结果为int，不能转bool
     //必须由对应peer接收；在确认发出前必须不断重发
     Reliable = (1 << 0),

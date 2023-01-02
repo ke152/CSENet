@@ -16,7 +16,7 @@ if (peer == null)
 }
 
 byte[] data = new byte[] { 1, 2, 3 };
-int flags = 0;
+CSENetPacketFlag flags = CSENetPacketFlag.None;
 CSENetPacket packet = new CSENetPacket(data, flags);
 peer.Send(0, packet);
 
@@ -25,7 +25,7 @@ CSENetEvent? e = null;
 long timeout = 1000;
 while (host.HostService(e, timeout) > 0)
 {
-    switch (e.type)
+    switch (e?.type)
     {
         case CSENetEventType.None:
             Console.WriteLine(e.type);

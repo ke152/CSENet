@@ -7,9 +7,9 @@ namespace CSENet;
 public class CSENetHost
 {
     public CSENetSocket? socket;
-    public IPEndPoint? address;                     /**< Internet address of the host */
-    public uint inBandwidth;           /**< downstream bandwidth of the host */
-    public uint outBandwidth;           /**< upstream bandwidth of the host */
+    public IPEndPoint? address;                     /* Internet address of the host */
+    public uint inBandwidth;           /* downstream bandwidth of the host */
+    public uint outBandwidth;           /* upstream bandwidth of the host */
     public uint bandwidthThrottleEpoch;
     public uint mtu;
     public uint randomSeed;
@@ -563,20 +563,10 @@ public class CSENetHost
 
     #region proto
 
-    public void ProtoChangeState(CSENetPeer peer, CSENetPeerState state)
-    {
-        if (state == CSENetPeerState.Connected || state == CSENetPeerState.DisconnectLater)
-            peer.OnConnect();
-        else
-            peer.OnDisconnect();
-
-        peer.state = state;
-    }
-
 
     public void ProtoDispatchState(CSENetPeer peer, CSENetPeerState state)
     {
-        ProtoChangeState(peer, state);
+        peer.ProtoChangeState(state);
 
         if (!(peer.needDispatch))
         {
@@ -601,7 +591,7 @@ public class CSENetHost
             {
                 case CSENetPeerState.ConnectionPending:
                 case CSENetPeerState.ConnectionSucceed:
-                    ProtoChangeState(peer, CSENetPeerState.Connected);
+                    peer.ProtoChangeState(CSENetPeerState.Connected);
                     if (@event != null)
                     {
                         @event.type = CSENetEventType.Connect;
@@ -659,7 +649,7 @@ public class CSENetHost
 
         if (@event != null)
         {
-            ProtoChangeState(peer, CSENetPeerState.Connected);
+            peer.ProtoChangeState(CSENetPeerState.Connected);
 
             @event.type = CSENetEventType.Connect;
             @event.peer = peer;
@@ -712,8 +702,11 @@ public class CSENetHost
             if (this.socket == null)
                 return -1;
 
-            receivedLength = this.socket.Receive(this.packetData[0], ref this.receivedAddress);
-            
+            byte[]? tmpBuffer = packetData[0];
+            if (tmpBuffer != null)
+            {
+                receivedLength = this.socket.Receive(tmpBuffer, ref this.receivedAddress);
+            }
 
             if (receivedLength < 0)
                 return -1;
@@ -1242,7 +1235,7 @@ public class CSENetHost
                     break;
 
                 case CSENetProtoCmdType.Ping:
-                    if (peer == null || ProtoHandlePing(peer) != 0)
+                    if (peer == null || peer.ProtoHandlePing() != 0)
                         goto commandError;
                     break;
 
@@ -1653,7 +1646,7 @@ public class CSENetHost
         }
         else
         if ( commandHeader.ProtoFlag.HasFlag(CSENetProtoFlag.CmdFlagAck) )
-            ProtoChangeState(peer, CSENetPeerState.AckDisconnect);
+            peer.ProtoChangeState(CSENetPeerState.AckDisconnect);
         else
             ProtoDispatchState(peer, CSENetPeerState.Zombie);
 

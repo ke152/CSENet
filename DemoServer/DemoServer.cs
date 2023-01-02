@@ -1,5 +1,6 @@
 ﻿using CSENet;
 using System.Net;
+using NLog;
 
 
 CSENetHost host = new();

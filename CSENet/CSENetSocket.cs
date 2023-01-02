@@ -33,10 +33,6 @@ public class CSENetSocket
     {
         socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
     }
-    private CSENetSocket(Socket socket)
-    {
-        this.socket = socket;
-    }
 
     ~CSENetSocket()
     {
@@ -48,6 +44,7 @@ public class CSENetSocket
         switch (type)
         {
             case CSENetSocketOptType.NonBlock:
+                //TODO: nonblock？
                 //socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReceiveTimeout, value);
                 //socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.SendTimeout, value);
                 //socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.UnblockSource, value);

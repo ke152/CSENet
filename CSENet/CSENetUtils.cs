@@ -6,8 +6,8 @@ namespace CSENet;
 
 class CSENetUtils
 {
-    private static DateTime timeStart = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-    private static DateTime timeBase = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime timeStart = new(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+    private static DateTime timeBase = new(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
     public static long TimeGet()
     {

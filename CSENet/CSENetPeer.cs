@@ -1015,4 +1015,14 @@ public class CSENetPeer
 
         return 0;
     }
+
+    public void ProtoChangeState(CSENetPeerState state)
+    {
+        if (state == CSENetPeerState.Connected || state == CSENetPeerState.DisconnectLater)
+            OnConnect();
+        else
+            OnDisconnect();
+
+        this.state = state;
+    }
 }
