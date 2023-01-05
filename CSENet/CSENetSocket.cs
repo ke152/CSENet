@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Net.Sockets;
+using NLog;
 
 namespace CSENet;
 
@@ -26,21 +27,25 @@ public enum CSENetSocketWait
 
 public class CSENetSocket
 {
+    private readonly Logger logger = LogManager.GetCurrentClassLogger();
     public Socket socket;
     public IPEndPoint? localIP;
 
     public CSENetSocket()
     {
+        logger.Debug("CSENetPeer::CSENetSocket");
         socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
     }
 
     ~CSENetSocket()
     {
+        logger.Debug("CSENetPeer::~CSENetSocket");
         socket.Close();
     }
 
     public void SetOption(CSENetSocketOptType type, int value)
     {
+        logger.Debug("CSENetPeer::SetOption");
         switch (type)
         {
             case CSENetSocketOptType.NonBlock:
@@ -80,23 +85,27 @@ public class CSENetSocket
 
     public void Shutdown(SocketShutdown how)
     {
+        logger.Debug("CSENetPeer::Shutdown");
         socket.Shutdown(how);
     }
 
     public void Bind(string ip, int port)
     {
+        logger.Debug("CSENetPeer::Bind(string ip, int port)");
         localIP = new IPEndPoint(IPAddress.Parse(ip), port);
         socket.Bind(localIP);//TODO：try-catch
     }
 
     public void Bind(IPEndPoint ep)
     {
+        logger.Debug("CSENetPeer::Bind(IPEndPoint ep)");
         socket.Bind(ep);//TODO：try-catch
         localIP = ep;
     }
 
     public IPEndPoint? GetAddress()
     {
+        logger.Debug("CSENetPeer::GetAddress");
         if (localIP == null)
         {
             localIP = socket.LocalEndPoint as IPEndPoint;
@@ -106,11 +115,13 @@ public class CSENetSocket
 
     public bool Wait(Int32 microSecondsTimeout, SelectMode mode)
     {
+        logger.Debug("CSENetPeer::Wait");
         return socket.Poll(microSecondsTimeout, mode);
     }
 
     public int SendTo(IPEndPoint? ep, List<byte[]> buffers)//TODO:批量发送，而不是一个一个发
     {
+        logger.Debug("CSENetPeer::SendTo");
         if (ep == null) return 0;
 
         int sentLength = 0;
@@ -131,6 +142,7 @@ public class CSENetSocket
 
     public int Receive(byte[] buffer, ref IPEndPoint? ep)
     {
+        logger.Debug("CSENetPeer::Receive");
         try
         {
             int length = socket.Receive(buffer);

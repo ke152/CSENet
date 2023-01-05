@@ -1,11 +1,14 @@
 ﻿using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
+using NLog;
 
 namespace CSENet;
 
 public class CSENetHost
 {
+    private static readonly Logger logger_ = LogManager.GetCurrentClassLogger();
+
     public CSENetSocket? socket;
     public IPEndPoint? address;                     /* Internet address of the host */
     public uint inBandwidth;           /* downstream bandwidth of the host */
@@ -43,6 +46,7 @@ public class CSENetHost
 
     public CSENetHost()
     {
+        logger_.Debug("CSENetHost::CSENetHost");
         this.packetData = new byte[2][];
         this.packetData[0] = new byte[CSENetDef.ProtoMaxMTU];
         this.packetData[1] = new byte[CSENetDef.ProtoMaxMTU];
@@ -50,6 +54,7 @@ public class CSENetHost
 
     public void Create(IPEndPoint? address, uint peerCount, uint channelLimit, uint incomingBandwidth, uint outgoingBandwidth)
     {
+        logger_.Debug("CSENetHost::Create");
         if (peerCount > CSENetDef.ProtoMaxPeerID)
             return;
 
@@ -127,6 +132,7 @@ public class CSENetHost
 
     public void Destroy()
     {
+        logger_.Debug("CSENetHost::Destroy");
         this.socket = null;
 
         if (this.peers == null) 
@@ -142,6 +148,7 @@ public class CSENetHost
 
     public uint Random()
     {
+        logger_.Debug("CSENetHost::Random");
         uint n = (this.randomSeed += 0x6D2B79F5U);
         n = (n ^ (n >> 15)) * (n | 1U);
         n ^= n + (n ^ (n >> 7)) * (n | 61U);
@@ -150,6 +157,7 @@ public class CSENetHost
 
     public void ChannelLimit(uint channelLimit)
     {
+        logger_.Debug("CSENetHost::ChannelLimit");
         if (channelLimit > 0 || channelLimit > CSENetDef.ProtoMaxChannelCount)
             channelLimit = CSENetDef.ProtoMaxChannelCount;
         else if (channelLimit < CSENetDef.ProtoMinChannelCount)
@@ -161,6 +169,7 @@ public class CSENetHost
 
     public void BandwidthLimit(uint incomingBandwidth, uint outgoingBandwidth)
     {
+        logger_.Debug("CSENetHost::BandwidthLimit");
         this.inBandwidth = incomingBandwidth;
         this.outBandwidth = outgoingBandwidth;
         this.recalculateBandwidthLimits = 1;
@@ -169,6 +178,7 @@ public class CSENetHost
 
     public void BandwidthThrottle()
     {
+        logger_.Debug("CSENetHost::BandwidthThrottle");
         uint timeCurrent = (uint)CSENetUtils.TimeGet();
         uint elapsedTime = timeCurrent - this.bandwidthThrottleEpoch,
            peersRemaining = (uint)this.connectedPeers,
@@ -338,12 +348,14 @@ public class CSENetHost
 
     public void Flush()
     {
+        logger_.Debug("CSENetHost::Flush");
         this.serviceTime = CSENetUtils.TimeGet();
         ProtoSendOutCmds(null, 0);
     }
 
     public CSENetPeer? Connect(IPEndPoint address, uint channelCount, uint data)
     {
+        logger_.Debug("CSENetHost::Connect");
         CSENetPeer? currentPeer = null;
 
         if (channelCount < (int)CSENetDef.ProtoMinChannelCount)
@@ -439,6 +451,7 @@ public class CSENetHost
 
     public void Broadcast(uint channelID, CSENetPacket packet)
     {
+        logger_.Debug("CSENetHost::Broadcast");
         if (this.peers == null)
             return;
 
@@ -453,6 +466,7 @@ public class CSENetHost
 
     public int CheckEvents(CSENetEvent? @event)
     {
+        logger_.Debug("CSENetHost::CheckEvents");
         if (@event == null) return -1;
 
         @event.type = CSENetEventType.None;
@@ -464,6 +478,7 @@ public class CSENetHost
 
     public int HostService(CSENetEvent? evt, long timeout)
     {
+        logger_.Debug("CSENetHost::HostService");
         if (evt != null)
         {
             evt.type = CSENetEventType.None;
@@ -557,6 +572,7 @@ public class CSENetHost
 
     private bool NeedCheckBandwidthThrottle()
     {
+        logger_.Debug("CSENetHost::NeedCheckBandwidthThrottle");
         return Math.Abs(this.serviceTime - this.bandwidthThrottleEpoch) >= (uint)CSENetDef.HostBandwidthThrottleInterval;
     }
 
@@ -566,6 +582,7 @@ public class CSENetHost
 
     public void ProtoDispatchState(CSENetPeer peer, CSENetPeerState state)
     {
+        logger_.Debug("CSENetHost::ProtoDispatchState");
         peer.ProtoChangeState(state);
 
         if (!(peer.needDispatch))
@@ -577,6 +594,7 @@ public class CSENetHost
 
     public int ProtoDispatchIncomingCommands(ref CSENetEvent? @event)
     {
+        logger_.Debug("CSENetHost::ProtoDispatchIncomingCommands");
         if (this.dispatchQueue == null) return -1;
 
         while (this.dispatchQueue.Count != 0)
@@ -645,6 +663,7 @@ public class CSENetHost
 
     public void ProtoNotifyConnect(CSENetPeer peer, CSENetEvent? @event)
     {
+        logger_.Debug("CSENetHost::ProtoNotifyConnect");
         this.recalculateBandwidthLimits = 1;
 
         if (@event != null)
@@ -661,6 +680,7 @@ public class CSENetHost
 
     public void ProtoNotifyDisconnect(CSENetPeer peer, CSENetEvent? @event)
     {
+        logger_.Debug("CSENetHost::ProtoNotifyDisconnect");
         if (peer.state >= CSENetPeerState.ConnectionPending)
             this.recalculateBandwidthLimits = 1;
 
@@ -687,6 +707,7 @@ public class CSENetHost
 
     public int ProtoReceiveIncomingCommands(CSENetEvent? @event)
     {
+        logger_.Debug("CSENetHost::ProtoReceiveIncomingCommands");
         if (this.packetData == null || this.packetData[0] == null)
             return -1;
 
@@ -738,6 +759,7 @@ public class CSENetHost
 
     public void ProtoSendAcknowledgements(CSENetPeer peer)
     {
+        logger_.Debug("CSENetHost::ProtoSendAcknowledgements");
         if (peer.acknowledgements.Count == 0)
         {
             return;
@@ -794,6 +816,7 @@ public class CSENetHost
 
     public int ProtoCheckTimeouts(CSENetPeer peer, CSENetEvent? @event)
     {
+        logger_.Debug("CSENetHost::ProtoCheckTimeouts");
         CSENetOutCmd outgoingCommand;
         CSENetOutCmd currentCommand;
 
@@ -847,6 +870,7 @@ public class CSENetHost
 
     public int ProtoCheckOutgoingCommands(CSENetPeer peer)
     {
+        logger_.Debug("CSENetHost::ProtoCheckOutgoingCommands");
         CSENetOutCmd outgoingCommand;
         CSENetOutCmd currentCommand;
         CSENetChannel? channel = null;
@@ -1020,6 +1044,7 @@ public class CSENetHost
 
     public int ProtoSendOutCmds(CSENetEvent? @event, int checkForTimeouts)
     {
+        logger_.Debug("CSENetHost::ProtoSendOutCmds");
         int sentLength = 0;
 
         if (this.peers == null || this.peers.Length == 0)
@@ -1123,6 +1148,7 @@ public class CSENetHost
 
     public int ProtoHandleIncomingCommands(CSENetEvent? @event)//TODO:delete
     {
+        logger_.Debug("CSENetHost::ProtoHandleIncomingCommands");
         CSENetProtoHeader? header;
         CSENetPeer? peer = null;
         int currentDataIdx = 0;
@@ -1317,6 +1343,7 @@ public class CSENetHost
 
     public int ProtoHandleAcknowledge(CSENetEvent? @event, CSENetPeer peer, CSENetProtoCmdHeader commandHeader, int commandStartIdx, int commandSize)
     {
+        logger_.Debug("CSENetHost::ProtoHandleAcknowledge");
         long roundTripTime,
                receivedSentTime;
         uint receivedReliableSequenceNumber;
@@ -1420,6 +1447,7 @@ public class CSENetHost
 
     public CSENetPeer? ProtoHandleConnect(int commandStartIdx, int commandSize)
     {
+        logger_.Debug("CSENetHost::ProtoHandleConnect");
         uint incomingSessionID, outgoingSessionID;
         uint mtu, windowSize;
         uint channelCount, duplicatePeers = 0;
@@ -1566,6 +1594,7 @@ public class CSENetHost
 
     public int ProtoHandleVerifyConnect(CSENetEvent? @event, CSENetPeer peer, int commandStartIdx, int commandSize)
     {
+        logger_.Debug("CSENetHost::ProtoHandleVerifyConnect");
         if (this.receivedData == null) return -1;
         CSENetProtoVerifyConnect? verifyConnectCmd = CSENetUtils.DeSerialize<CSENetProtoVerifyConnect>(CSENetUtils.SubBytes(this.receivedData, commandStartIdx, commandSize));
         if (verifyConnectCmd == null) return -1;
@@ -1626,6 +1655,7 @@ public class CSENetHost
 
     public int ProtoHandleDisconnect(CSENetProtoCmdHeader commandHeader, CSENetPeer peer, int commandStartIdx, int commandSize)
     {
+        logger_.Debug("CSENetHost::ProtoHandleDisconnect");
         if (peer.state == (int)CSENetPeerState.Disconnected || peer.state == CSENetPeerState.Zombie || peer.state == CSENetPeerState.AckDisconnect)
             return 0;
 
@@ -1660,6 +1690,7 @@ public class CSENetHost
 
     public int ProtoHandleSendUnreliable(CSENetProtoCmdHeader commandHeader, CSENetPeer peer, int commandStartIdx, int commandSize, ref int currentDataIdx)
     {
+        logger_.Debug("CSENetHost::ProtoHandleSendUnreliable");
         uint dataLength;
 
         if (commandHeader.channelID >= peer.ChannelCount ||
@@ -1686,6 +1717,7 @@ public class CSENetHost
 
     public int ProtoHandleSendReliable(CSENetProtoCmdHeader commandHeader, CSENetPeer peer, int commandStartIdx, int commandSize, ref int currentDataIdx)
     {
+        logger_.Debug("CSENetHost::ProtoHandleSendReliable");
         if (this.receivedData == null) return -1;
         CSENetProtoSendReliable? sendReliableCmd = CSENetUtils.DeSerialize<CSENetProtoSendReliable>(CSENetUtils.SubBytes(this.receivedData, commandStartIdx, commandSize));
         if (sendReliableCmd == null) return -1;
@@ -1714,6 +1746,7 @@ public class CSENetHost
 
     public int ProtoHandleBandwidthLimit(CSENetPeer peer, int commandStartIdx, int commandSize)
     {
+        logger_.Debug("CSENetHost::ProtoHandleBandwidthLimit");
         if (peer.state != CSENetPeerState.Connected && peer.state != CSENetPeerState.DisconnectLater)
             return -1;
 
@@ -1751,6 +1784,7 @@ public class CSENetHost
 
     public int ProtoHandleSendFragment(CSENetProtoCmdHeader commandHeader, CSENetPeer peer, int commandStartIdx, int commandSize, ref int currentDataIdx)
     {
+        logger_.Debug("CSENetHost::ProtoHandleSendFragment");
         uint fragmentNumber,
                fragmentCount,
                fragmentOffset,
@@ -1861,6 +1895,7 @@ public class CSENetHost
 
     public int ProtoHandleThrottleConfigure(CSENetPeer peer, int commandStartIdx, int commandSize)
     {
+        logger_.Debug("CSENetHost::ProtoHandleThrottleConfigure");
         if (peer.state != CSENetPeerState.Connected && peer.state != CSENetPeerState.DisconnectLater)
             return -1;
 
@@ -1877,6 +1912,7 @@ public class CSENetHost
 
     public int ProtoHandleSendUnsequenced(CSENetProtoCmdHeader commandHeader, CSENetPeer peer, int commandStartIdx, int commandSize, ref int currentDataIdx)
     {
+        logger_.Debug("CSENetHost::ProtoHandleSendUnsequenced");
         uint unsequencedGroup, index;
         uint dataLength;
 
@@ -1928,6 +1964,7 @@ public class CSENetHost
 
     public int ProtoHandleSendUnreliableFragment(CSENetProtoCmdHeader commandHeader, CSENetPeer peer, int commandStartIdx, int commandSize, ref int currentDataIdx)
     {
+        logger_.Debug("CSENetHost::ProtoHandleSendUnreliableFragment");
         uint fragmentNumber,
                fragmentCount,
                fragmentOffset,

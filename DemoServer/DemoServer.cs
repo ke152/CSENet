@@ -2,6 +2,7 @@
 using System.Net;
 using NLog;
 
+var logger = LogManager.GetCurrentClassLogger();
 
 CSENetHost host = new();
 host.Create(new IPEndPoint(IPAddress.Parse("127.0.0.1"), 19001), 3, 3, 0, 0);

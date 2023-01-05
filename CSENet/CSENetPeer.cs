@@ -1,5 +1,6 @@
 ﻿using System.Net;
 using System.Runtime.InteropServices;
+using NLog;
 
 namespace CSENet;
 
@@ -19,6 +20,8 @@ public enum CSENetPeerState
 
 public class CSENetPeer
 {
+    private readonly Logger logger = LogManager.GetCurrentClassLogger();
+
     public CSENetHost? host;
     public uint outPeerID;
     public uint inPeerID;
@@ -82,6 +85,7 @@ public class CSENetPeer
 
     public void Reset()
     {
+        logger.Debug("CSENetPeer::Reset");
         OnDisconnect();
 
         this.outPeerID = CSENetDef.ProtoMaxPeerID;
@@ -138,6 +142,7 @@ public class CSENetPeer
 
     public void OnDisconnect()
     {
+        logger.Debug("CSENetPeer::OnDisconnect");
         if (this.host == null)
             return;
 
@@ -154,6 +159,7 @@ public class CSENetPeer
 
     public void ResetQueues()
     {
+        logger.Debug("CSENetPeer::ResetQueues");
         if (this.host != null)
         {
             this.host.dispatchQueue.Remove(this);
@@ -173,6 +179,7 @@ public class CSENetPeer
 
     public void QueueOutgoingCommand(CSENetProto cmd, CSENetPacket? packet, uint offset, uint length)
     {
+        logger.Debug("CSENetPeer::QueueOutgoingCommand");
         CSENetOutCmd outCmd = new();
         outCmd.cmd = cmd;
         outCmd.fragmentOffset = offset;
@@ -190,6 +197,7 @@ public class CSENetPeer
 
     public void SetupOutCmd(CSENetOutCmd outCmd)
     {
+        logger.Debug("CSENetPeer::SetupOutCmd");
 
         if (outCmd.cmdHeader.channelID == 0xFF)
         {
@@ -284,7 +292,8 @@ public class CSENetPeer
 
     public void OnConnect()
     {
-        if (state !=CSENetPeerState.Connected && state != CSENetPeerState.DisconnectLater)
+        logger.Debug("CSENetPeer::OnConnect");
+        if (state != CSENetPeerState.Connected && state != CSENetPeerState.DisconnectLater)
         {
             if (this.host == null) return;
 
@@ -297,6 +306,7 @@ public class CSENetPeer
 
     public void QueueAck(CSENetProtoCmdHeader cmdHeader, uint sentTime)
     {
+        logger.Debug("CSENetPeer::QueueAck");
         if (cmdHeader.channelID < channels?.Length)
         {
             CSENetChannel channel = channels[cmdHeader.channelID];
@@ -322,6 +332,7 @@ public class CSENetPeer
     //TODO：这个函数可能应该交给channel
     public void DispatchInUnreliableCmds(CSENetChannel channel, CSENetInCmd? queuedCmd)
     {
+        logger.Debug("CSENetPeer::DispatchInUnreliableCmds");
         if (channel.inUnreliableCmds.Count == 0) return;
 
         CSENetInCmd startCmd = channel.inUnreliableCmds.First();
@@ -418,6 +429,7 @@ public class CSENetPeer
 
     public void DispatchInReliableCmds(CSENetChannel channel, CSENetInCmd? queuedCmd)
     {
+        logger.Debug("CSENetPeer::DispatchInReliableCmds");
         if (channel.inReliableCmds.Count == 0) return;
 
         CSENetInCmd currentCmd = channel.inReliableCmds[0];
@@ -456,6 +468,7 @@ public class CSENetPeer
 
     public int Send(uint channelID, CSENetPacket packet)
     {
+        logger.Debug("CSENetPeer::Send");
         CSENetChannel channel;
         CSENetProto cmd = new();
         uint fragmentLength;
@@ -485,6 +498,7 @@ public class CSENetPeer
 
     private int SendNoFragment(uint channelID, CSENetPacket packet, CSENetChannel channel, CSENetProto cmd)
     {
+        logger.Debug("CSENetPeer::SendNoFragment");
         cmd.header.channelID = channelID;
 
         if ( !packet.Flags.HasFlag(CSENetPacketFlag.Reliable) && packet.Flags.HasFlag(CSENetPacketFlag.UnSeq) )
@@ -517,6 +531,7 @@ public class CSENetPeer
 
     private int SendFragment(uint channelID, CSENetPacket packet, CSENetChannel channel, ref uint fragmentLength)
     {
+        logger.Debug("CSENetPeer::SendFragment");
         uint fragmentCount = (packet.DataLength + fragmentLength - 1) / fragmentLength, fragmentNumber, fragmentOffset;
         CSENetProtoCmdType cmdType;
         CSENetProtoFlag protoFlag = 0;
@@ -585,6 +600,7 @@ public class CSENetPeer
 
     public CSENetPacket? Receive(ref uint channelID)
     {
+        logger.Debug("CSENetPeer::Receive");
         CSENetInCmd inCmd;
         CSENetPacket? packet;
 
@@ -606,6 +622,7 @@ public class CSENetPeer
     }
     public void Ping()
     {
+        logger.Debug("CSENetPeer::Ping");
         CSENetProto command = new();
 
         if (this.state != CSENetPeerState.Connected)
@@ -620,11 +637,13 @@ public class CSENetPeer
 
     public void PingInterval(uint pingInterval)//TODO: rename setPingInxxxx
     {
+        logger.Debug("CSENetPeer::PingInterval");
         this.pingInterval = pingInterval != 0 ? pingInterval : CSENetDef.PeerPingInterval;
     }
 
     public void Timeout(uint timeoutLimit, uint timeoutMinimum, uint timeoutMaximum)//TODO: rename setTimeout
     {
+        logger.Debug("CSENetPeer::Timeout");
         this.timeoutLimit = timeoutLimit != 0 ? timeoutLimit : CSENetDef.PeerTimeoutLimit;
         this.timeoutMinimum = timeoutMinimum != 0 ? timeoutMinimum : CSENetDef.PeerTimeoutMin;
         this.timeoutMaximum = timeoutMaximum != 0 ? timeoutMaximum : CSENetDef.PeerTimeoutMax;
@@ -632,6 +651,7 @@ public class CSENetPeer
 
     public CSENetInCmd? QueueInCmd(CSENetProtoCmdHeader cmdHeader, byte[]? data, CSENetPacketFlag flags, uint fragmentCount, uint sendUnreliableSeqNum = 0)
     {
+        logger.Debug("CSENetPeer::QueueInCmd");
         CSENetInCmd dummyCmd = new();
 
         if (channels == null) return null;
@@ -793,6 +813,7 @@ public class CSENetPeer
 
     public void ThrottleConfigure(uint interval, uint acceleration, uint deceleration)
     {
+        logger.Debug("CSENetPeer::ThrottleConfigure");
         CSENetProto command = new();
 
         this.packetThrottleInterval = interval;
@@ -813,6 +834,7 @@ public class CSENetPeer
 
     public int Throttle(long rtt)
     {
+        logger.Debug("CSENetPeer::Throttle");
         if (this.lastRoundTripTime <= this.lastRTTVariance)
         {
             this.packetThrottle = this.packetThrottleLimit;
@@ -840,6 +862,7 @@ public class CSENetPeer
     }
     public void DisconnectNow(uint data)
     {
+        logger.Debug("CSENetPeer::DisconnectNow");
         CSENetProto command = new();
 
         if (this.state == CSENetPeerState.Disconnected)
@@ -866,6 +889,7 @@ public class CSENetPeer
 
     public void DisconnectLater(uint data)
     {
+        logger.Debug("CSENetPeer::DisconnectLater");
         if ((this.state == CSENetPeerState.Connected || this.state == CSENetPeerState.DisconnectLater) &&
             this.outCmds.Count != 0 && this.sentReliableCmds.Count == 0)
         {
@@ -878,6 +902,7 @@ public class CSENetPeer
 
     public void Disconnect(uint data)
     {
+        logger.Debug("CSENetPeer::Disconnect");
         CSENetProto command = new();
 
         if (this.state == CSENetPeerState.Disconnecting ||
@@ -916,6 +941,7 @@ public class CSENetPeer
 
     public void ProtoRemoveSentUnreliableCommands()
     {
+        logger.Debug("CSENetPeer::ProtoRemoveSentUnreliableCommands");
         if (sentUnreliableCmds.Count == 0)
             return;
 
@@ -929,6 +955,7 @@ public class CSENetPeer
 
     public CSENetProtoCmdType ProtoRemoveSentReliableCommand(uint reliableSequenceNumber, uint channelID)
     {
+        logger.Debug("CSENetPeer::ProtoRemoveSentReliableCommand");
         CSENetOutCmd? outgoingCommand = null;
         CSENetProtoCmdType commandNumber = CSENetProtoCmdType.None;
         int wasSent = 1;
@@ -1010,6 +1037,7 @@ public class CSENetPeer
 
     public int ProtoHandlePing()
     {
+        logger.Debug("CSENetPeer::ProtoHandlePing");
         if (state != CSENetPeerState.Connected && state != CSENetPeerState.DisconnectLater)
             return -1;
 
@@ -1018,6 +1046,7 @@ public class CSENetPeer
 
     public void ProtoChangeState(CSENetPeerState state)
     {
+        logger.Debug("CSENetPeer::ProtoChangeState");
         if (state == CSENetPeerState.Connected || state == CSENetPeerState.DisconnectLater)
             OnConnect();
         else

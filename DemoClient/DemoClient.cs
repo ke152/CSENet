@@ -1,7 +1,8 @@
 ﻿using CSENet;
 using System.Net;
+using NLog;
 
-
+var logger = LogManager.GetCurrentClassLogger();
 
 CSENetHost host = new();
 host.Create(null, 3, 3, 0, 0);
